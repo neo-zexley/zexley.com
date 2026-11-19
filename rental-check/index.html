@@ -35,6 +35,7 @@
         <h1>Rental listing red-flag checker</h1>
         <p class="lede">Before you send a deposit, answer a few questions about the listing. You get a risk summary, what to verify, and how to look up who really owns the place.</p>
         <p><span class="badge">Free</span><span class="badge">No sign-up</span><span class="badge">Runs in your browser. Nothing you type is sent to us.</span></p>
+        <p class="note" role="note">Your result is based only on the answers you give. It is not a finding about any landlord or listing, and it is not legal advice. <a href="../terms.html">Terms</a></p>
         <div class="disclaimer" role="note">
           <strong>Why it matters:</strong> since 2020, people have reported nearly 65,000 rental scams to the FTC, with about $65 million lost and a median loss of $1,000. About half of the people reporting in the year to June 2025 said it started with a Facebook ad. (<a href="https://search.ftc.gov/system/files/ftc_gov/pdf/rental-scams-spotlight-2025.pdf">FTC Data Spotlight, December 2025</a>)
         </div>
@@ -62,7 +63,11 @@
           <p class="no-print"><button type="submit" class="btn">Show my risk summary</button> <button type="reset" class="small-btn" id="reset">Start over</button></p>
         </form>
 
-        <div class="out" id="out" aria-live="polite">
+        <div class="out" id="out">
+          <div class="disclaimer" id="results-legal" role="note">
+            <strong>About this result.</strong> It is based only on the answers you entered. It is not a finding or accusation about any landlord, property manager, or listing. County and other public records can be outdated or incomplete, so confirm them with the official source. This is not legal advice. If you suspect fraud, contact the platform where you found the listing, your bank or payment app, and the authorities (for example, <a href="https://reportfraud.ftc.gov/">ReportFraud.ftc.gov</a> and <a href="https://www.ic3.gov/">ic3.gov</a>). See our <a href="../terms.html">Terms</a>.
+          </div>
+          <div aria-live="polite">
           <p class="kicker">Your result</p>
           <h2>Risk summary</h2>
           <div class="risk" id="risk">
@@ -79,6 +84,7 @@
           <div class="btn-row no-print"><button type="button" class="small-btn" id="copy">Copy summary</button><button type="button" class="small-btn" id="print">Print</button></div>
           <p class="status" id="copy-status" role="status"></p>
           <p class="note">This is a checklist, not a verdict. A low score doesn't prove a listing is real, and a high one doesn't prove it's a scam. Never pay until you've verified who you're dealing with.</p>
+          </div>
         </div>
 
         <section id="owner" style="padding:2rem 0 0">

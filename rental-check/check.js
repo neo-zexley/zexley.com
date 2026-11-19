@@ -170,7 +170,7 @@
     (x.r.todos.length ? x.r.todos : ["Nothing"]).forEach(function (f) { lines.push("- " + f); });
     lines.push("", "Next steps:");
     x.steps.forEach(function (s, i) { lines.push((i + 1) + ". " + s); });
-    lines.push("", "A checklist, not a verdict. Not legal advice.");
+    lines.push("", "This result is based only on your answers. It is not a finding or accusation about any landlord, property manager, or listing. Public records may be outdated or incomplete; confirm with the official source. Not legal advice. If you suspect fraud, contact the platform, your bank, and the authorities. See zexley.com/terms");
     return lines.join("\n");
   }
 

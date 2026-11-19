@@ -277,8 +277,10 @@ form.tool legend {
 }
 .field input:focus, .field select:focus, .field textarea:focus { outline: 3px solid var(--ember); outline-offset: 1px; }
 .two-col { display: grid; gap: 0 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
-.out { margin-top: 2rem; }
+.out { margin-top: 2rem; scroll-margin-top: 6.5rem; }
 .out h2 { margin-top: 1.6rem; }
+.out .disclaimer { margin: 0 0 1.4rem; }
+.tool-hero .note { max-width: 46rem; }
 .out-box {
   background: #fff;
   border: 1px solid var(--line);

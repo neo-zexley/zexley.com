@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Free rental listing red-flag checker: spot a rental scam before you pay | Zexley</title>
+  <meta name="description" content="Free checklist and scorer for a rental listing. Check the price, payment method, pressure, and copied photos, learn how to look up the real owner in county records, and get clear next steps. Runs in your browser.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Zexley">
+  <meta property="og:title" content="Rental listing red-flag checker">
+  <meta property="og:description" content="Before you send a deposit: score the listing's red flags, look up the real owner in county records, reverse-search the photos, and get clear next steps. Free and private.">
+  <meta property="og:url" content="https://zexley.com/rental-check/">
+  <meta property="og:image" content="https://zexley.com/og/rental-check.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://zexley.com/rental-check/">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site">
+    <div class="wrap nav">
+      <a class="brand" href="/">Zex<span>ley</span></a>
+      <nav class="links" aria-label="Primary">
+        <a href="../">Home</a>
+        <a href="./" aria-current="page">Rental red-flag checker</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="tool-hero">
+      <div class="wrap">
+        <p class="kicker">Free tool</p>
+        <h1>Rental listing red-flag checker</h1>
+        <p class="lede">Before you send a deposit, answer a few questions about the listing. You get a risk summary, what to verify, and how to look up who really owns the place.</p>
+        <p><span class="badge">Free</span><span class="badge">No sign-up</span><span class="badge">Runs in your browser. Nothing you type is sent to us.</span></p>
+        <div class="disclaimer" role="note">
+          <strong>Why it matters:</strong> since 2020, people have reported nearly 65,000 rental scams to the FTC, with about $65 million lost and a median loss of $1,000. About half of the people reporting in the year to June 2025 said it started with a Facebook ad. (<a href="https://search.ftc.gov/system/files/ftc_gov/pdf/rental-scams-spotlight-2025.pdf">FTC Data Spotlight, December 2025</a>)
+        </div>
+      </div>
+    </section>
+
+    <section style="padding-top:0">
+      <div class="wrap">
+        <form class="tool" id="rc" novalidate>
+          <fieldset>
+            <legend>1. The price</legend>
+            <p class="hint">Compare with at least five similar places nearby (same bedrooms, similar area) on the big listing sites. HUD also publishes <a href="https://www.huduser.gov/portal/datasets/fmr.html">Fair Market Rents by county</a> as a rough guide.</p>
+            <div class="two-col">
+              <div class="field"><label for="rent">Listed monthly rent ($)</label><input id="rent" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 900"></div>
+              <div class="field"><label for="typical">Typical rent for similar places ($)</label><input id="typical" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 1400"></div>
+            </div>
+            <p class="status" id="price-note" role="status"></p>
+          </fieldset>
+
+          <fieldset>
+            <legend>2. The listing and the landlord</legend>
+            <p class="hint">Answer what you know. "Not sure" turns into a to-do in your summary.</p>
+            <div id="questions"></div>
+          </fieldset>
+          <p class="no-print"><button type="submit" class="btn">Show my risk summary</button> <button type="reset" class="small-btn" id="reset">Start over</button></p>
+        </form>
+
+        <div class="out" id="out" aria-live="polite">
+          <p class="kicker">Your result</p>
+          <h2>Risk summary</h2>
+          <div class="risk" id="risk">
+            <p class="level" id="level">Answer the questions above</p>
+            <div class="meter" aria-hidden="true"><div id="meter"></div></div>
+            <p id="level-text" class="note" style="max-width:none;margin:0"></p>
+          </div>
+          <h3 style="margin-top:1.3rem">Red flags found</h3>
+          <ul class="flags" id="flags"></ul>
+          <h3>Still to check</h3>
+          <ul class="flags" id="todos"></ul>
+          <h3>Next steps</h3>
+          <ol id="steps"></ol>
+          <div class="btn-row no-print"><button type="button" class="small-btn" id="copy">Copy summary</button><button type="button" class="small-btn" id="print">Print</button></div>
+          <p class="status" id="copy-status" role="status"></p>
+          <p class="note">This is a checklist, not a verdict. A low score doesn't prove a listing is real, and a high one doesn't prove it's a scam. Never pay until you've verified who you're dealing with.</p>
+        </div>
+
+        <section id="owner" style="padding:2rem 0 0">
+          <p class="kicker">How to verify</p>
+          <h2>Look up who really owns the property</h2>
+          <p class="lede">Every county keeps public property records. They're usually free to search online. A scammer can copy photos, but they can't change who the county says owns the house.</p>
+          <ol class="steps">
+            <li><strong>Find the county.</strong> Search the full street address on any map site to see which county it's in.</li>
+            <li><strong>Open the county assessor's property search.</strong> Depending on the state it may be called the assessor, property appraiser, appraisal district, auditor, or tax collector. Use the official government site. Skip paid "property records" sites.</li>
+            <li><strong>Search by address and note the owner's name</strong> and the last sale date. If the house sold last month but the "landlord" says they've owned it for years, ask why.</li>
+            <li><strong>Optional: check the recorder or register of deeds</strong> for the latest deed if the assessor's data looks out of date.</li>
+            <li><strong>If the owner is a company (LLC),</strong> look it up on your state's business registry (usually the Secretary of State) and ask the landlord how they're connected. A real property manager can show a management agreement and has a business you can call.</li>
+            <li><strong>Compare.</strong> The name should match the person you're dealing with, or a management company you've confirmed separately. Ask for the owner to confirm by phone using a number you found yourself, not one from the listing.</li>
+          </ol>
+
+          <div class="card" style="margin-top:1rem">
+            <h3>Find your county's property search</h3>
+            <div class="two-col">
+              <div class="field"><label for="county">County</label><input id="county" type="text" maxlength="40" placeholder="e.g. Hamilton"></div>
+              <div class="field"><label for="state">State</label><input id="state" type="text" maxlength="30" placeholder="e.g. Indiana"></div>
+            </div>
+            <p><a class="small-btn" id="county-link" href="#" target="_blank" rel="noopener noreferrer" style="text-decoration:none" aria-disabled="true">Search for the official site</a></p>
+            <p class="hint">Opens a web search for "[County] County [State] assessor property search". Look for a .gov address or the county's own site.</p>
+          </div>
+
+          <h3 style="margin-top:1.3rem">Official property searches for some large counties</h3>
+          <p class="hint">We checked these links on November 19, 2026.</p>
+          <ul>
+            <li><a href="https://www.cookcountyassessoril.gov/">Cook County, IL (Chicago): Cook County Assessor's Office</a></li>
+            <li><a href="https://portal.assessor.lacounty.gov/">Los Angeles County, CA: Assessor Portal</a></li>
+            <li><a href="https://hcad.org/">Harris County, TX (Houston): Harris Central Appraisal District</a></li>
+            <li><a href="https://mcassessor.maricopa.gov/">Maricopa County, AZ (Phoenix): Maricopa County Assessor's Office</a></li>
+            <li><a href="https://www.miamidadepa.gov/pa/home.page">Miami-Dade County, FL: Property Appraiser</a></li>
+            <li><a href="https://www.indy.gov/activity/find-an-assessed-property-value">Marion County, IN (Indianapolis): Assessor property search</a>; deeds at the <a href="https://www.indy.gov/activity/search-real-estate-records-online">Recorder's Office</a></li>
+          </ul>
+        </section>
+
+        <section id="photos" style="padding:2rem 0 0">
+          <p class="kicker">How to verify</p>
+          <h2>Check whether the photos were copied</h2>
+          <p class="lede">The FTC says scammers often copy a real listing, sometimes one that's for sale rather than for rent, and swap in their own contact details.</p>
+          <ol class="steps">
+            <li><strong>Save two or three of the listing photos.</strong> On a phone, press and hold the photo and choose Save. On a computer, right-click and save.</li>
+            <li><strong>Run a reverse image search.</strong> Use <a href="https://images.google.com/">Google Images</a> (click the camera icon) or Google Lens in the Google app, <a href="https://tineye.com/">TinEye</a>, or <a href="https://www.bing.com/visualsearch">Bing Visual Search</a>. Upload each photo.</li>
+            <li><strong>Search the address and the text.</strong> Search the full address, then a distinctive sentence from the description in quotation marks.</li>
+            <li><strong>Read the results.</strong> Warning signs: the same photos with a different price, a different contact name, or a "for sale" listing. Seeing the same landlord and price on several rental sites is normal.</li>
+          </ol>
+        </section>
+
+        <aside class="upsell no-print" aria-labelledby="upsell-h">
+          <p class="kicker">Done for you</p>
+          <h2 id="upsell-h">We'll verify the owner records and listing history for you.</h2>
+          <p>Send us the listing link and address. We look up the county owner and deed records, reverse-search the photos, look for copies of the listing elsewhere, and send you a short written report of what we found, with links to each source.</p>
+          <p class="price">$49 <small>per listing</small></p>
+          <p><a class="btn" id="early-list" href="mailto:neo@zexley.com?subject=Early%20list%3A%20Rental%20check%20(%2449)">Join the early list</a></p>
+          <p class="note">Not open for orders yet. Joining just means we'll email you when it opens. No payment is taken. We work from public records and online listings only. We don't visit properties, and a report can't guarantee a listing is legitimate.</p>
+        </aside>
+
+        <section id="sources" style="padding:2rem 0 0">
+          <h2>Sources and where to report</h2>
+          <ul>
+            <li><a href="https://search.ftc.gov/system/files/ftc_gov/pdf/rental-scams-spotlight-2025.pdf">FTC Data Spotlight: "Rental scams hit home with $65 million in reported losses" (December 2025)</a>. Source of the warning signs around upfront payments, copied listings, credit-check links, early requests for personal information, below-market rent, and pressure.</li>
+            <li><a href="https://reportfraud.ftc.gov/">ReportFraud.ftc.gov</a>: report a rental scam to the FTC.</li>
+            <li><a href="https://www.ic3.gov/">FBI Internet Crime Complaint Center (IC3)</a>: report online fraud, especially if you lost money.</li>
+          </ul>
+        </section>
+
+        <p class="ai-note" style="margin-top:2rem"><strong>Built by Zexley, an AI-run company.</strong> This checklist was written by an AI agent from public FTC guidance. It isn't legal advice. If something looks wrong, email <a href="mailto:neo@zexley.com">neo@zexley.com</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap foot-grid">
+      <div>
+        <p><a class="brand" href="/">Zex<span>ley</span></a></p>
+        <p>Zexley is a brand of Bloom Commerce LLC (Indiana), an AI-run company.</p>
+        <p><a href="mailto:neo@zexley.com">neo@zexley.com</a></p>
+      </div>
+      <div><p><a href="../">Home</a></p></div>
+      <div><p><a href="../privacy.html">Privacy</a><br><a href="../terms.html">Terms</a></p></div>
+    </div>
+  </footer>
+  <script src="check.js"></script>
+</body>
+</html>

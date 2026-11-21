@@ -1,0 +1,889 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- No network: this CSP blocks fetch/XHR/beacons/websockets, external scripts, fonts and images. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Group Chat Wrapped 2026 — Zexley</title>
+<meta name="description" content="Turn your WhatsApp group chat export into a year-in-review recap with kind, funny group awards. Runs entirely on your device. Not affiliated with WhatsApp, Meta, or Spotify.">
+<link rel="icon" href="data:,">
+<style>
+:root{--paper:#f3eee4;--ink:#1a1814;--muted:#5c564c;--ember:#b03c14;--ember-dark:#8a2e10;--line:#d4c9b6;--card:#fffaf2;--pine:#12352a;--gold:#d9a441;
+--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;--sans:"Segoe UI","Helvetica Neue",Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:1.02rem;line-height:1.55}
+a{color:var(--ember-dark)}
+.wrap{width:min(100% - 2rem,44rem);margin-inline:auto}
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:#fff;padding:.5rem 1rem}.skip:focus{left:.5rem;z-index:20}
+.proto{background:#2b2b2b;color:#ffd98a;text-align:center;font-size:.85rem;padding:.4rem 1rem}
+header.site{border-bottom:1px solid var(--line)}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:.8rem 0;gap:1rem}
+.brand{font-family:var(--serif);font-weight:600;font-size:1.35rem;color:var(--ink);text-decoration:none}.brand span{color:var(--ember)}
+h1,h2,h3{font-family:var(--serif);letter-spacing:-.02em;line-height:1.2;margin:0 0 .6rem}
+h1{font-size:clamp(2rem,7vw,3rem)}
+.kicker{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ember);font-weight:700;margin:0 0 .5rem}
+.hero{padding:2.2rem 0 1rem}
+.lede{font-size:1.1rem;color:var(--muted)}
+.btn{display:inline-block;background:var(--ember);color:#fff;text-decoration:none;padding:.75rem 1.15rem;border-radius:4px;font-weight:600;border:0;cursor:pointer;font-size:1rem;font-family:inherit}
+.btn:hover{background:var(--ember-dark)}
+.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}.btn-ghost:hover{background:var(--ink);color:#fff}
+.btn:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.drop{border:2px dashed var(--ember);background:var(--card);border-radius:10px;padding:1.6rem 1rem;text-align:center;margin:1.2rem 0}
+.drop.over{background:#fdeee2}
+.drop label{font-weight:700;cursor:pointer;text-decoration:underline;color:var(--ember-dark)}
+.drop input{position:absolute;width:1px;height:1px;opacity:0}
+.drop input:focus-visible + label{outline:3px solid var(--gold)}
+.or{color:var(--muted);margin:.7rem 0}
+.status{min-height:1.4em;font-weight:600}.status.err{color:#a11}
+.privacy{background:var(--pine);color:#f3eee4;border-radius:10px;padding:1rem 1.2rem;margin:1rem 0}
+.privacy strong{color:var(--gold)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem 1.2rem;margin:1rem 0}
+.card h2{font-size:1.3rem}
+.card ol,.card ul{padding-left:1.2rem;margin:.3rem 0}
+details{border-top:1px solid var(--line);padding:.6rem 0}details summary{cursor:pointer;font-weight:600}
+footer{border-top:1px solid var(--line);margin-top:2rem;padding:1.2rem 0 2rem;color:var(--muted);font-size:.88rem}
+/* deck */
+#deck{padding:1rem 0 2rem}
+.deck-bar{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin:.6rem 0}
+#counter{font-variant-numeric:tabular-nums;color:var(--muted)}
+.slide{position:relative;aspect-ratio:9/16;max-height:78vh;width:min(100%,26rem);margin:0 auto;border-radius:18px;overflow:hidden;color:#fffaf2;
+background:radial-gradient(circle at 20% 10%,rgba(217,164,65,.28),transparent 40%),linear-gradient(160deg,var(--pine),#1a1814 60%,#6e2410)}
+.slide-busy{background:radial-gradient(circle at 80% 15%,rgba(217,164,65,.3),transparent 40%),linear-gradient(160deg,#6e2410,#1a1814 70%)}
+.slide-talk{background:linear-gradient(170deg,#1f4d3a,#12352a 60%,#1a1814)}
+.slide-streak,.slide-laugh{background:linear-gradient(160deg,#8a2e10,#3a1408 70%)}
+.slide-emoji,.slide-word{background:linear-gradient(160deg,#12352a,#0b201a)}
+.slide-inner{position:absolute;inset:0;padding:1.6rem 1.4rem;display:flex;flex-direction:column;justify-content:center;gap:.4rem;overflow:auto}
+.slide-kicker{color:var(--gold);text-transform:uppercase;letter-spacing:.12em;font-size:.78rem;font-weight:700;margin:0}
+.slide-title{font-size:clamp(1.6rem,6vw,2.1rem);margin:.2rem 0 .4rem;overflow-wrap:anywhere}
+.big{margin:.5rem 0}.big-num{font-family:var(--serif);font-size:clamp(2.2rem,11vw,3.4rem);font-weight:700;line-height:1.05;overflow-wrap:anywhere}
+.big-label{color:#e8dcc6;font-size:.95rem}
+.slide-sub{color:#e8dcc6;margin:.3rem 0}
+.slide-note{background:rgba(255,255,255,.1);border-radius:8px;padding:.5rem .7rem;font-size:.85rem;color:#f3eee4}
+.bars{list-style:none;padding:0;margin:.6rem 0;display:grid;gap:.45rem}
+.bars li{display:grid;grid-template-columns:7.5rem 1fr 2.6rem;align-items:center;gap:.5rem;font-size:.88rem}
+.bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{background:rgba(255,255,255,.12);height:.7rem;border-radius:4px;overflow:hidden}.bar-fill{display:block;height:100%;background:var(--gold)}
+.bar-val{text-align:right;font-variant-numeric:tabular-nums}
+.bars .bar-more{display:block;color:#e8dcc6}
+.mini{list-style:none;padding:0;margin:.4rem 0;display:grid;gap:.2rem;font-size:.95rem}
+.awards{list-style:none;padding:0;margin:.3rem 0;display:grid;gap:.75rem}
+.awards li{display:flex;gap:.7rem;align-items:flex-start}
+.aw-emoji{font-size:1.9rem;line-height:1}
+.awards strong{display:block;color:var(--gold);font-family:var(--serif);font-size:1.1rem}
+.aw-win{display:block;font-weight:700}.aw-line{display:block;color:#e8dcc6;font-size:.85rem}
+.sum{display:grid;grid-template-columns:auto 1fr;gap:.25rem .8rem;margin:.4rem 0}.sum dt{color:var(--gold);font-size:.85rem}.sum dd{margin:0;font-weight:700;text-align:right;overflow-wrap:anywhere}
+.sum-awards{list-style:none;padding:0;margin:.5rem 0;font-size:.85rem;display:grid;gap:.15rem}
+.slide-foot{font-size:.7rem;color:#cfc3ad;margin-top:auto}
+.slide.locked .slide-inner{filter:blur(9px);user-select:none;pointer-events:none}
+.lock{display:none}
+.slide.locked .lock{display:flex;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:1.5rem;text-align:center;background:rgba(18,53,42,.35)}
+.lock-title{font-weight:700;font-size:1.1rem;margin:0}
+.unlock-btn{background:var(--gold);color:var(--ink)}.unlock-btn:hover{background:#f0c060}
+.lock-note{font-size:.8rem;color:#e8dcc6;max-width:20rem;margin:0;line-height:1.45}
+.lock-note a{color:var(--gold)}
+#dots{display:flex;flex-wrap:wrap;gap:.35rem;justify-content:center;margin:.8rem 0}
+.dot{width:.65rem;height:.65rem;border-radius:50%;border:0;background:var(--line);padding:0;cursor:pointer}.dot.on{background:var(--ember)}
+.deck-actions{display:flex;flex-wrap:wrap;gap:.6rem;justify-content:center;margin:.8rem 0}
+#paynote{background:#fff3d6;border:1px solid var(--gold);border-radius:10px;padding:.9rem 1rem;margin:.8rem auto;max-width:26rem}
+.small{font-size:.86rem;color:var(--muted)}
+.saved{background:#fff3d6;border:1px solid var(--gold);border-radius:10px;padding:.9rem 1rem;margin:1rem 0}
+#deck-msg{background:#e6f2ea;border:1px solid #7aa88c;border-radius:10px;padding:.7rem 1rem;margin:.6rem auto;max-width:26rem;font-weight:600}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site"><div class="wrap nav"><a class="brand" href="../index.html">Zex<span>ley</span></a><span class="small" data-brand>Group Chat Wrapped 2026</span></div></header>
+
+<main id="main" class="wrap">
+  <section id="intro">
+    <div class="saved" id="saved" hidden role="status">
+      <p class="saved-msg" style="margin:0 0 .6rem;font-weight:600"></p>
+      <button class="btn" id="saved-open" type="button">Open my saved recap</button>
+      <button class="btn btn-ghost" id="saved-forget" type="button">Forget it now</button>
+    </div>
+    <div class="hero">
+      <p class="kicker">🎄 Family &amp; friends edition</p>
+      <h1 data-brand>Group Chat Wrapped 2026</h1>
+      <p class="lede">Drop in a WhatsApp group chat export and get a year-in-review slide deck: who talked most, your busiest day, emoji of the year, and up to 12 kind, silly group awards.</p>
+      <p class="small">An AI-assisted product made by Zexley. No AI reads your chat: the stats come from plain code running on your device.</p>
+    </div>
+
+    <div class="privacy" role="note">
+      <p><strong>Your chat never leaves your device and is never uploaded or stored.</strong> All the counting happens in this browser tab. Once loaded, this page makes no network requests and has no analytics or cookies.</p>
+      <p style="margin-bottom:0">Only if you unlock: just before checkout, the finished stats (names, counts, top words and emoji, awards — never your messages) are saved in this browser so your recap is waiting when you come back. They are deleted automatically after 2 hours if you don’t finish, 24 hours after you pay, or right away when you press “Forget”.</p>
+    </div>
+
+    <div class="drop" id="drop">
+      <p style="margin:0 0 .4rem">Drag your exported chat here (<b>.txt</b> or <b>.zip</b>)</p>
+      <input type="file" id="file" accept=".txt,.zip,text/plain,application/zip">
+      <label for="file">or choose a file</label>
+      <p class="or">— or —</p>
+      <button class="btn" id="sample" type="button">Try with a sample chat</button>
+      <p class="small" style="margin:.5rem 0 0">The sample is a made-up family chat (the “Puddleworths”). No real people.</p>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <div class="card">
+      <h2>How to export a WhatsApp chat</h2>
+      <ol>
+        <li>Open the group chat in WhatsApp.</li>
+        <li><b>iPhone:</b> tap the group name → <i>Export Chat</i> → <i>Without Media</i>. <b>Android:</b> ⋮ menu → <i>More</i> → <i>Export chat</i> → <i>Without media</i>.</li>
+        <li>Save the file to your phone or computer (Files app, Drive, or email it to yourself).</li>
+        <li>Drop the <b>.zip</b> or <b>.txt</b> here. A zip is opened right here in your browser. If your browser can’t, unzip it and drop the <b>_chat.txt</b> inside.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Be kind with it</h2>
+      <ul>
+        <li>A group chat holds other people’s messages too. Only use chats you’re part of.</li>
+        <li>Share the results with the group, kindly. The awards are for fun, not verdicts about anyone.</li>
+        <li>Stats are computed by code from your export. Awards are playful labels picked by simple rules.</li>
+      </ul>
+    </div>
+
+    <div class="card" id="faq">
+      <h2>FAQ</h2>
+      <details><summary>Is my chat uploaded anywhere?</summary><p>No. The file is read by JavaScript in this tab and never sent anywhere — not to us, not to anyone. There is no server step. You can even turn on airplane mode after the page loads and it still works.</p></details>
+      <details><summary>What do I get for free?</summary><p>The first 4 slides: total messages, busiest day and hour, who talked most, and your longest streak. A one-time $4.99 unlock shows the rest, including all the awards and the full share image.</p></details>
+      <details><summary>Is the $4.99 a subscription?</summary><p>No. It’s a one-time payment, not a subscription. If the unlock doesn’t work or you’re unhappy, email neo@zexley.com within 14 days of purchase and we’ll refund the $4.99. You don’t need to send us your chat. Payment is handled by Stripe on its own checkout page.</p></details>
+      <details><summary>What is saved on my device when I unlock?</summary><p>Checkout happens on Stripe’s page, so before you go we save the finished stats (group and member names, counts, top words and emoji, and the awards) in this browser’s local storage. Your messages are never saved. When Stripe sends you back, the full recap opens unlocked. The saved stats are deleted after 2 hours if you don’t pay, 24 hours after you pay, or when you press “Forget my recap now”. Nothing is sent to us.</p></details>
+      <details><summary>Who made this?</summary><p>Zexley, an assumed business name of Bloom Commerce LLC (Indiana). Zexley is AI-run: this product, its code and its copy were made with AI assistance. No AI reads your chat — the stats come from ordinary code running in your browser.</p></details>
+      <details><summary>Is this an official WhatsApp product?</summary><p>No. <span data-brand>Group Chat Wrapped 2026</span> is not affiliated with, endorsed by, or connected to WhatsApp, Meta, or Spotify. It just reads the export file WhatsApp lets you create.</p></details>
+      <details><summary>Does it work with iMessage, Telegram or Signal?</summary><p>Not yet. WhatsApp exports only for now.</p></details>
+      <details><summary>Some numbers look off.</summary><p>Exports vary by phone, language and settings, so counts can be imperfect. If the chat has 2026 messages we count 2026 only; otherwise we count everything and say so.</p></details>
+    </div>
+  </section>
+
+  <section id="deck" hidden aria-label="Your recap slides">
+    <p id="deck-msg" hidden role="status"></p>
+    <div class="deck-bar">
+      <button class="btn btn-ghost" id="prev" type="button" aria-label="Previous slide">←</button>
+      <span id="counter" aria-live="polite"></span>
+      <button class="btn btn-ghost" id="next" type="button" aria-label="Next slide">→</button>
+    </div>
+    <div id="slides"></div>
+    <div id="dots"></div>
+    <div id="paynote" hidden role="status">
+      <p class="pay-msg" style="margin:0 0 .6rem;font-weight:600"></p>
+      <div class="deck-actions" style="justify-content:flex-start;margin:0">
+        <button class="btn" id="preview-unlock" type="button">Preview the full deck (prototype only)</button>
+        <button class="btn btn-ghost" id="simulate-return" type="button">Simulate paying &amp; returning (prototype only)</button>
+        <button class="btn btn-ghost" id="paynote-close" type="button">Close</button>
+      </div>
+    </div>
+    <div class="deck-actions">
+      <button class="btn" id="share" type="button">Download share image</button>
+      <button class="btn btn-ghost" id="restart" type="button">Start over (clears the chat)</button>
+      <button class="btn btn-ghost" id="forget" type="button">Forget my recap now</button>
+    </div>
+    <p class="small" style="text-align:center">The share image is made on your device. It shows names from your chat, so share it with your group, kindly.</p>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <p>Made by Zexley with AI assistance. Zexley is an assumed business name of Bloom Commerce LLC (Indiana). Stats are computed by code; awards are for fun. Not affiliated with, endorsed by, or connected to WhatsApp, Meta, or Spotify.</p>
+  <p><a href="../privacy.html">Privacy</a> · <a href="../terms.html">Terms</a> · neo@zexley.com · made at zexley.com</p>
+</div></footer>
+
+<!--SAMPLE-START--><script type="text/plain" id="sample-chat">(Fictional sample chat made up by Zexley for demos. The Puddleworth family is not real.)
+[12/19/25, 9:00:00 AM] The Puddleworths 🎄: ‎Messages and calls are end-to-end encrypted. Only people in this chat can read, listen to, or share them.
+[12/19/25, 9:00:01 AM] The Puddleworths 🎄: ‎Grandma Marigold created group “The Puddleworths 🎄”
+[12/19/25, 9:00:02 AM] The Puddleworths 🎄: ‎Grandma Marigold added Cousin Pip
+[12/23/25, 12:12:02 AM] Cousin Pip: ‎GIF omitted
+[12/23/25, 12:12:57 AM] Juniper Puddleworth: Count me in 🙌
+[12/23/25, 12:14:47 AM] Juniper Puddleworth: haha yes!
+[12/25/25, 9:28:56 AM] Juniper Puddleworth: haha yes!
+[12/25/25, 9:34:50 AM] Cousin Pip: this meme is us 😂😂
+[12/28/25, 12:01:12 AM] Cousin Pip: LOL that is so true 😂
+[12/28/25, 12:33:47 AM] Uncle Barnaby: Traffic was fine
+[12/28/25, 12:47:47 AM] Grandma Marigold: Remember to call your mother!
+[12/28/25, 1:03:28 AM] Grandma Marigold: How do I make the text bigger on this phone?
+[12/28/25, 1:22:55 AM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[1/2/26, 6:59:32 PM] Uncle Barnaby: ok
+[1/2/26, 7:04:29 PM] Gus Puddleworth: ‎This message was deleted.
+[1/2/26, 7:49:22 PM] Uncle Barnaby: Grill is fired up 🔥
+[1/2/26, 7:55:43 PM] Cousin Pip: ‎sticker omitted
+[1/4/26, 10:52:49 PM] Cousin Pip: hahaha
+[1/4/26, 10:54:41 PM] Juniper Puddleworth: Count me in 🙌
+[1/4/26, 10:59:44 PM] Uncle Barnaby: ok see you then
+[1/4/26, 11:01:25 PM] Juniper Puddleworth: Sounds good 👍
+[1/4/26, 11:04:35 PM] Aunt Clementine: Coffee is ready ☕
+[1/11/26, 5:46:15 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[1/11/26, 5:49:46 AM] Gus Puddleworth: I fixed the gutter!!
+[1/11/26, 6:11:31 AM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[1/17/26, 11:10:27 AM] Gus Puddleworth: Go team!!! 🏈
+[1/17/26, 11:11:04 AM] Juniper Puddleworth: Haha same
+[1/24/26, 1:20:49 AM] Cousin Pip: lol
+[1/24/26, 1:31:45 AM] Gus Puddleworth: Road trip!!!
+[1/24/26, 1:33:14 AM] Juniper Puddleworth: ‎image omitted
+[1/24/26, 1:45:13 AM] Gus Puddleworth: ‎video omitted
+[1/25/26, 6:38:51 PM] Uncle Barnaby: k.
+[1/25/26, 6:41:28 PM] Juniper Puddleworth: Saving you a seat
+[1/25/26, 6:53:54 PM] Grandma Marigold: Love you all to the moon 🌙❤️
+[1/28/26, 6:45:42 AM] Grandma Marigold: How do I make the text bigger on this phone?
+[1/28/26, 6:55:59 AM] Cousin Pip: night night 🌙
+[1/28/26, 7:01:20 AM] Grandma Marigold: How do I make the text bigger on this phone?
+[1/28/26, 7:05:21 AM] Gus Puddleworth: I fixed the gutter!!
+[1/28/26, 7:12:16 AM] Grandma Marigold: Good morning my darlings ❤️
+[2/1/26, 8:10:23 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[2/1/26, 8:11:47 AM] Juniper Puddleworth: Just landed ✈️
+[2/1/26, 8:26:24 AM] Cousin Pip: i regret nothing 😂
+[2/1/26, 8:35:39 AM] Grandma Marigold: Remember to call your mother!
+[2/5/26, 11:22:35 PM] Cousin Pip: hahaha
+[2/5/26, 11:25:01 PM] Grandma Marigold: Remember to call your mother!
+[2/5/26, 11:32:10 PM] Gus Puddleworth: Who wants pancakes?!
+[2/5/26, 11:40:00 PM] Grandma Marigold: Good morning my darlings ❤️
+[2/8/26, 1:45:49 AM] Cousin Pip: ok but hear me out
+[2/8/26, 1:50:37 AM] Grandma Marigold: Remember to call your mother!
+[2/8/26, 2:15:24 AM] Uncle Barnaby: Grill is fired up 🔥
+[2/9/26, 5:31:09 AM] Aunt Clementine: Coffee is ready ☕
+[2/9/26, 5:44:34 AM] Gus Puddleworth: Go team!!! 🏈
+[2/9/26, 6:15:42 AM] Uncle Barnaby: ok see you then
+[2/9/26, 6:26:48 AM] Aunt Clementine: Happy Monday family ☀️
+[2/11/26, 6:01:04 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[2/11/26, 6:14:09 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[2/11/26, 6:29:28 AM] Gus Puddleworth: Go team!!! 🏈
+[2/11/26, 6:48:57 AM] Uncle Barnaby: Grill is fired up 🔥
+[2/14/26, 8:23:20 AM] Grandma Marigold: Love you all to the moon 🌙❤️
+[2/14/26, 8:34:31 AM] Cousin Pip: who ate the last cookie 😂
+[2/14/26, 8:35:11 AM] Juniper Puddleworth: Haha love it
+[2/14/26, 8:45:21 AM] Cousin Pip: this meme is us 😂😂
+[2/14/26, 8:50:21 AM] Gus Puddleworth: Road trip!!!
+[2/17/26, 5:36:40 AM] Aunt Clementine: Coffee is ready ☕
+[2/17/26, 5:38:17 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[2/17/26, 5:50:41 AM] Aunt Clementine: Happy Monday family ☀️
+[2/17/26, 5:52:59 AM] Gus Puddleworth: ‎This message was deleted.
+[2/17/26, 5:59:07 AM] Grandma Marigold: Who borrowed my good pie dish? 🥧
+[2/20/26, 1:30:25 AM] Cousin Pip: who ate the last cookie 😂
+[2/20/26, 1:31:08 AM] Juniper Puddleworth: Totally
+[2/20/26, 1:38:54 AM] Gus Puddleworth: Garage sale this weekend!
+[2/27/26, 1:19:46 AM] Cousin Pip: lol
+[2/27/26, 1:34:53 AM] Cousin Pip: LOL that is so true 😂
+[2/27/26, 2:17:11 AM] Uncle Barnaby: Grill is fired up 🔥
+[2/27/26, 2:34:58 AM] Uncle Barnaby: k
+[3/1/26, 5:52:43 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[3/1/26, 5:56:16 AM] Cousin Pip: night night 🌙
+[3/3/26, 6:34:47 AM] Aunt Clementine: Coffee is ready ☕
+[3/3/26, 6:46:47 AM] Cousin Pip: lmao
+[3/4/26, 5:13:38 AM] Aunt Clementine: Weather looks lovely today
+[3/4/26, 5:13:57 AM] Juniper Puddleworth: Count me in 🙌
+[3/5/26, 8:09:35 PM] Uncle Barnaby: ok see you then
+[3/5/26, 8:23:15 PM] Grandma Marigold: Sending hugs 🤗❤️
+[3/5/26, 8:37:09 PM] Gus Puddleworth: Go team!!! 🏈
+[3/5/26, 8:45:04 PM] Cousin Pip: new high score 🎮
+[3/8/26, 11:17:16 PM] Cousin Pip: cant sleep, anyone up?
+[3/8/26, 11:39:37 PM] Uncle Barnaby: k.
+[3/10/26, 6:53:04 AM] Aunt Clementine: Good morning everyone ☀️
+[3/10/26, 6:59:21 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[3/10/26, 7:02:36 AM] Gus Puddleworth: Road trip!!!
+[3/17/26, 6:31:48 PM] Uncle Barnaby: k
+[3/17/26, 6:41:24 PM] Grandma Marigold: Love you all to the moon 🌙❤️
+[3/18/26, 12:54:27 PM] Uncle Barnaby: Ok
+[3/18/26, 12:55:29 PM] Juniper Puddleworth: Haha love it
+[3/18/26, 1:23:18 PM] Uncle Barnaby: Ok
+[3/18/26, 1:35:35 PM] Cousin Pip: ‎sticker omitted
+[3/18/26, 1:51:03 PM] Grandma Marigold: Love you all to the moon 🌙❤️
+[3/29/26, 2:42:56 AM] Cousin Pip: lmao
+[3/29/26, 2:57:48 AM] Grandma Marigold: Good morning my darlings ❤️
+[3/29/26, 3:06:47 AM] Gus Puddleworth: Pizza night!! 🍕
+[3/29/26, 3:50:46 AM] Uncle Barnaby: Ok
+[3/29/26, 3:58:24 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[3/30/26, 1:59:41 AM] Cousin Pip: lol same
+[3/30/26, 2:02:00 AM] Juniper Puddleworth: Haha love it
+[3/30/26, 2:09:47 AM] Aunt Clementine: Anyone up for a garden day?
+[4/3/26, 6:29:20 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[4/3/26, 6:36:50 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[4/3/26, 6:37:37 AM] Juniper Puddleworth: ‎image omitted
+[4/6/26, 5:25:23 AM] Aunt Clementine: Coffee is ready ☕
+[4/6/26, 5:25:48 AM] Juniper Puddleworth: Yes please!
+[4/6/26, 5:59:16 AM] Uncle Barnaby: Traffic was fine
+[4/6/26, 6:00:55 AM] Juniper Puddleworth: Sounds good 👍
+[4/6/26, 6:02:46 AM] Juniper Puddleworth: ‎image omitted
+[4/7/26, 1:44:09 AM] Cousin Pip: new high score 🎮
+[4/7/26, 1:45:49 AM] Juniper Puddleworth: Count me in 🙌
+[4/7/26, 1:47:15 AM] Cousin Pip: cant sleep, anyone up?
+[4/7/26, 1:53:40 AM] Cousin Pip: new high score 🎮
+[4/12/26, 7:10:18 PM] Grandma Marigold: How do I make the text bigger on this phone?
+[4/12/26, 7:23:06 PM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[4/12/26, 7:24:02 PM] Juniper Puddleworth: Saving you a seat
+[4/12/26, 7:37:44 PM] Cousin Pip: LOL that is so true 😂
+[4/13/26, 7:51:24 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[4/13/26, 8:04:48 AM] Uncle Barnaby: Traffic was fine
+[4/14/26, 1:20:44 AM] Cousin Pip: this meme is us 😂😂
+[4/14/26, 1:33:51 AM] Grandma Marigold: Who borrowed my good pie dish? 🥧
+[4/14/26, 1:51:33 AM] Uncle Barnaby: Grill is fired up 🔥
+[4/14/26, 2:02:48 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[4/14/26, 2:04:00 AM] Juniper Puddleworth: On my way!
+[4/16/26, 6:53:31 AM] Aunt Clementine: Good morning everyone ☀️
+[4/16/26, 6:54:16 AM] Juniper Puddleworth: Omw
+[4/16/26, 7:08:07 AM] Gus Puddleworth: Road trip!!!
+[4/16/26, 7:22:55 AM] Gus Puddleworth: Big news everyone!
+[4/17/26, 6:03:33 AM] Aunt Clementine: Weather looks lovely today
+[4/17/26, 6:10:57 AM] Cousin Pip: LOL that is so true 😂
+[4/17/26, 6:12:12 AM] Juniper Puddleworth: On my way!
+[4/17/26, 6:22:06 AM] Uncle Barnaby: ok
+[4/17/26, 6:24:53 AM] Grandma Marigold: How do I make the text bigger on this phone?
+[4/21/26, 7:13:19 AM] Aunt Clementine: Weather looks lovely today
+[4/21/26, 7:26:50 AM] Uncle Barnaby: Traffic was fine
+[4/21/26, 7:33:20 AM] Grandma Marigold: I knitted three more scarves 🧣 who needs one?
+[4/21/26, 7:40:23 AM] Gus Puddleworth: ‎This message was deleted.
+[4/26/26, 6:14:10 PM] Uncle Barnaby: Traffic was fine
+[4/26/26, 6:18:02 PM] Cousin Pip: LOL that is so true 😂
+[5/1/26, 7:37:58 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[5/1/26, 8:04:14 AM] Uncle Barnaby: Grill is fired up 🔥
+[5/1/26, 8:05:18 AM] Juniper Puddleworth: Haha love it
+[5/1/26, 8:08:37 AM] Cousin Pip: LOL that is so true 😂
+[5/13/26, 6:45:35 AM] Aunt Clementine: Weather looks lovely today
+[5/13/26, 6:50:12 AM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[5/13/26, 7:01:12 AM] Cousin Pip: cant sleep, anyone up?
+[5/13/26, 7:05:12 AM] Grandma Marigold: Remember to call your mother!
+[5/13/26, 7:25:30 AM] Uncle Barnaby: k.
+[5/17/26, 10:36:05 PM] Cousin Pip: ‎sticker omitted
+[5/17/26, 10:37:38 PM] Juniper Puddleworth: Totally
+[5/17/26, 10:39:18 PM] Cousin Pip: hahaha
+[5/17/26, 10:49:10 PM] Cousin Pip: ‎GIF omitted
+[5/26/26, 3:35:06 AM] Cousin Pip: lol
+[5/26/26, 3:35:48 AM] Juniper Puddleworth: Saving you a seat
+[5/26/26, 3:42:14 AM] Grandma Marigold: Good morning my darlings ❤️
+[5/26/26, 3:56:07 AM] Uncle Barnaby: ok see you then
+[5/26/26, 4:09:01 AM] Cousin Pip: this meme is us 😂😂
+[5/31/26, 5:28:20 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[5/31/26, 5:43:20 AM] Uncle Barnaby: ok see you then
+[5/31/26, 5:54:36 AM] Aunt Clementine: Weather looks lovely today
+[6/2/26, 5:38:01 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[6/2/26, 5:52:31 AM] Grandma Marigold: Remember to call your mother!
+[6/2/26, 5:53:34 AM] Juniper Puddleworth: Yes please!
+[6/2/26, 6:08:14 AM] Gus Puddleworth: Big news everyone!
+[6/2/26, 6:20:12 AM] Cousin Pip: ‎sticker omitted
+[6/4/26, 3:07:12 AM] Cousin Pip: i regret nothing 😂
+[6/4/26, 3:36:33 AM] Uncle Barnaby: k
+[6/4/26, 3:52:04 AM] Cousin Pip: this meme is us 😂😂
+[6/4/26, 4:21:38 AM] Uncle Barnaby: ok
+[6/4/26, 4:23:26 AM] Juniper Puddleworth: Count me in 🙌
+[6/5/26, 5:48:29 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[6/5/26, 5:55:48 AM] Grandma Marigold: Remember to call your mother!
+[6/5/26, 5:58:01 AM] Juniper Puddleworth: Omw
+[6/5/26, 6:01:43 AM] Grandma Marigold: ‎image omitted
+[6/8/26, 6:43:55 AM] Grandma Marigold: I knitted three more scarves 🧣 who needs one?
+[6/8/26, 6:57:55 AM] Cousin Pip: lol same
+[6/10/26, 12:37:06 PM] Uncle Barnaby: ok
+[6/10/26, 12:44:35 PM] Uncle Barnaby: Grill is fired up 🔥
+[6/10/26, 12:56:06 PM] Cousin Pip: night night 🌙
+[6/10/26, 1:01:17 PM] Cousin Pip: lol
+[6/10/26, 1:13:25 PM] Cousin Pip: ‎sticker omitted
+[6/11/26, 6:13:18 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[6/11/26, 6:29:02 AM] Cousin Pip: hahaha
+[6/11/26, 6:36:45 AM] Aunt Clementine: Coffee is ready ☕
+[6/11/26, 6:38:02 AM] Juniper Puddleworth: Ooh what time?
+[6/11/26, 6:48:46 AM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[6/12/26, 8:01:54 AM] Gus Puddleworth: Garage sale this weekend!
+[6/12/26, 8:05:43 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[6/12/26, 8:15:53 AM] Gus Puddleworth: Road trip!!!
+[6/13/26, 2:19:46 AM] Cousin Pip: lol same
+[6/13/26, 2:49:12 AM] Uncle Barnaby: k.
+[6/13/26, 3:02:46 AM] Cousin Pip: this meme is us 😂😂
+[6/13/26, 3:14:34 AM] Gus Puddleworth: Go team!!! 🏈
+[6/14/26, 2:57:11 AM] Cousin Pip: this meme is us 😂😂
+[6/14/26, 3:09:30 AM] Uncle Barnaby: ok see you then
+[6/14/26, 3:11:19 AM] Cousin Pip: cant sleep, anyone up?
+[6/15/26, 8:04:32 PM] Uncle Barnaby: Grill is fired up 🔥
+[6/15/26, 8:11:49 PM] Cousin Pip: ‎sticker omitted
+[6/15/26, 8:17:44 PM] Cousin Pip: new high score 🎮
+[6/16/26, 12:09:34 AM] Cousin Pip: lol same
+[6/16/26, 12:34:57 AM] Uncle Barnaby: ok
+[6/17/26, 1:32:55 AM] Cousin Pip: ok but hear me out
+[6/17/26, 1:35:12 AM] Juniper Puddleworth: Totally
+[6/17/26, 1:37:59 AM] Grandma Marigold: Good morning my darlings ❤️
+[6/17/26, 2:22:08 AM] Uncle Barnaby: Ok
+[6/18/26, 6:08:33 PM] Uncle Barnaby: Ok
+[6/18/26, 6:14:55 PM] Cousin Pip: ok but hear me out
+[6/18/26, 6:24:01 PM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[6/19/26, 5:45:19 AM] Aunt Clementine: Happy Monday family ☀️
+[6/19/26, 5:58:44 AM] Cousin Pip: ‎sticker omitted
+[6/20/26, 6:26:44 AM] Aunt Clementine: Weather looks lovely today
+[6/20/26, 6:41:15 AM] Grandma Marigold: Sending hugs 🤗❤️
+[6/21/26, 10:18:33 PM] Cousin Pip: who ate the last cookie 😂
+[6/21/26, 10:32:39 PM] Grandma Marigold: Is it supposed to rain on Saturday?
+[6/22/26, 10:14:09 PM] Cousin Pip: ‎sticker omitted
+[6/22/26, 10:28:50 PM] Aunt Clementine: Weather looks lovely today
+[6/22/26, 10:29:45 PM] Juniper Puddleworth: Totally
+[6/22/26, 10:36:20 PM] Gus Puddleworth: Go team!!! 🏈
+[6/22/26, 10:54:18 PM] Uncle Barnaby: k
+[6/23/26, 12:55:21 AM] Cousin Pip: ‎GIF omitted
+[6/23/26, 1:07:44 AM] Grandma Marigold: Remember to call your mother!
+[6/23/26, 1:18:54 AM] Uncle Barnaby: ok
+[6/23/26, 1:26:49 AM] Grandma Marigold: Sending hugs 🤗❤️
+[6/24/26, 8:46:47 PM] Uncle Barnaby: ok
+[6/24/26, 8:50:29 PM] Grandma Marigold: I knitted three more scarves 🧣 who needs one?
+[6/24/26, 9:06:42 PM] Aunt Clementine: Weather looks lovely today
+[6/24/26, 9:08:25 PM] Juniper Puddleworth: Omw
+[6/25/26, 8:16:53 AM] Gus Puddleworth: ‎This message was deleted.
+[6/25/26, 8:55:58 AM] Uncle Barnaby: ok
+[6/25/26, 8:59:57 AM] Grandma Marigold: Proud of you all ❤️❤️
+[6/26/26, 7:27:20 AM] Aunt Clementine: Coffee is ready ☕
+[6/26/26, 7:34:56 AM] Gus Puddleworth: Pizza night!! 🍕
+[6/26/26, 7:36:19 AM] Juniper Puddleworth: ‎image omitted
+[6/27/26, 1:50:38 AM] Cousin Pip: who ate the last cookie 😂
+[6/27/26, 2:07:54 AM] Uncle Barnaby: ok
+[6/27/26, 2:10:45 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[6/28/26, 6:20:48 AM] Aunt Clementine: Weather looks lovely today
+[6/28/26, 6:36:40 AM] Gus Puddleworth: Pizza night!! 🍕
+[6/28/26, 6:38:25 AM] Juniper Puddleworth: ‎image omitted
+[6/28/26, 6:40:08 AM] Gus Puddleworth: I fixed the gutter!!
+[6/29/26, 6:07:05 AM] Aunt Clementine: Good morning everyone ☀️
+[6/29/26, 6:08:20 AM] Juniper Puddleworth: Omw
+[6/29/26, 6:37:37 AM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[6/30/26, 6:50:49 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[6/30/26, 6:56:05 AM] Gus Puddleworth: I fixed the gutter!!
+[6/30/26, 6:57:33 AM] Juniper Puddleworth: ‎image omitted
+[6/30/26, 7:09:02 AM] Gus Puddleworth: I fixed the gutter!!
+[7/1/26, 6:31:02 AM] Aunt Clementine: Happy Monday family ☀️
+[7/1/26, 6:33:00 AM] Juniper Puddleworth: Yes please!
+[7/1/26, 6:40:12 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[7/1/26, 6:41:51 AM] Juniper Puddleworth: Ooh what time?
+[7/1/26, 6:47:37 AM] Grandma Marigold: Remember to call your mother!
+[7/2/26, 5:53:44 AM] Aunt Clementine: Anyone up for a garden day?
+[7/2/26, 5:55:23 AM] Juniper Puddleworth: ‎image omitted
+[7/2/26, 6:03:24 AM] Cousin Pip: lmao
+[7/3/26, 12:06:39 AM] Cousin Pip: this meme is us 😂😂
+[7/3/26, 12:07:55 AM] Gus Puddleworth: Garage sale this weekend!
+[7/4/26, 6:00:27 AM] Grandma Marigold: Remember to call your mother!
+[7/4/26, 6:12:29 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[7/4/26, 6:12:50 AM] Juniper Puddleworth: haha yes!
+[7/4/26, 6:43:50 AM] Uncle Barnaby: ok
+[7/4/26, 6:47:21 AM] Gus Puddleworth: Who wants pancakes?!
+[7/4/26, 6:48:51 AM] Juniper Puddleworth: ‎image omitted
+[7/4/26, 6:57:43 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[7/4/26, 6:58:35 AM] Juniper Puddleworth: haha yes!
+[7/4/26, 7:05:28 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[7/4/26, 7:07:39 AM] Juniper Puddleworth: ‎image omitted
+[7/4/26, 7:24:36 AM] Uncle Barnaby: Traffic was fine
+[7/4/26, 7:48:43 AM] Uncle Barnaby: ok
+[7/4/26, 7:59:44 AM] Cousin Pip: ‎sticker omitted
+[7/4/26, 8:10:46 AM] Gus Puddleworth: ‎This message was deleted.
+[7/4/26, 8:16:40 AM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[7/4/26, 8:21:42 AM] Cousin Pip: new high score 🎮
+[7/4/26, 8:31:41 AM] Cousin Pip: LOL that is so true 😂
+[7/4/26, 8:41:33 AM] Grandma Marigold: Remember to call your mother!
+[7/4/26, 8:56:43 AM] Aunt Clementine: Good morning everyone ☀️
+[7/4/26, 12:02:03 PM] Juniper Puddleworth: ‎image omitted
+[7/4/26, 12:08:57 PM] Cousin Pip: ‎sticker omitted
+[7/4/26, 12:25:37 PM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[7/4/26, 12:40:34 PM] Grandma Marigold: How do I make the text bigger on this phone?
+[7/4/26, 12:54:32 PM] Cousin Pip: new high score 🎮
+[7/4/26, 1:01:03 PM] Cousin Pip: lmao
+[7/4/26, 1:04:49 PM] Grandma Marigold: Sending hugs 🤗❤️
+[7/4/26, 1:10:13 PM] Aunt Clementine: Anyone up for a garden day?
+[7/4/26, 1:13:23 PM] Gus Puddleworth: Who wants pancakes?!
+[7/4/26, 1:14:45 PM] Juniper Puddleworth: Sounds good 👍
+[7/4/26, 1:26:23 PM] Grandma Marigold: Did everyone eat breakfast?
+[7/4/26, 1:32:16 PM] Aunt Clementine: Who is hosting Sunday dinner?
+[7/4/26, 1:41:07 PM] Grandma Marigold: Remember to call your mother!
+[7/4/26, 1:41:41 PM] Juniper Puddleworth: Saving you a seat
+[7/4/26, 1:51:15 PM] Gus Puddleworth: ‎This message was deleted.
+[7/4/26, 1:52:32 PM] Juniper Puddleworth: ‎image omitted
+[7/4/26, 2:25:25 PM] Uncle Barnaby: k.
+[7/4/26, 2:38:10 PM] Grandma Marigold: Did everyone eat breakfast?
+[7/4/26, 2:44:17 PM] Gus Puddleworth: Road trip!!!
+[7/4/26, 2:49:22 PM] Grandma Marigold: I knitted three more scarves 🧣 who needs one?
+[7/4/26, 3:01:46 PM] Gus Puddleworth: Best day ever!
+[7/4/26, 7:34:05 PM] Gus Puddleworth: ‎This message was deleted.
+[7/4/26, 7:48:59 PM] Grandma Marigold: Is it supposed to rain on Saturday?
+[7/4/26, 8:32:41 PM] Uncle Barnaby: k.
+[7/4/26, 8:44:45 PM] Grandma Marigold: Who borrowed my good pie dish? 🥧
+[7/4/26, 9:00:08 PM] Cousin Pip: lmao
+[7/4/26, 9:04:46 PM] Grandma Marigold: Who borrowed my good pie dish? 🥧
+[7/4/26, 9:11:38 PM] Cousin Pip: this meme is us 😂😂
+[7/4/26, 9:33:34 PM] Uncle Barnaby: Traffic was fine
+[7/4/26, 9:34:01 PM] Juniper Puddleworth: ‎image omitted
+[7/4/26, 9:44:27 PM] Aunt Clementine: Happy Monday family ☀️
+[7/4/26, 9:46:29 PM] Juniper Puddleworth: Sounds good 👍
+[7/4/26, 9:49:51 PM] Gus Puddleworth: Big news everyone!
+[7/4/26, 9:54:11 PM] Grandma Marigold: Who borrowed my good pie dish? 🥧
+[7/4/26, 10:06:59 PM] Gus Puddleworth: Who wants pancakes?!
+[7/4/26, 10:20:27 PM] Grandma Marigold: Love you all to the moon 🌙❤️
+[7/4/26, 10:22:14 PM] Juniper Puddleworth: Haha same
+[7/4/26, 10:33:36 PM] Gus Puddleworth: Garage sale this weekend!
+[7/4/26, 10:34:41 PM] Juniper Puddleworth: Haha same
+[7/4/26, 11:00:54 PM] Uncle Barnaby: ok see you then
+[7/4/26, 11:08:40 PM] Gus Puddleworth: Who wants pancakes?!
+[7/4/26, 11:13:10 PM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[7/4/26, 11:25:32 PM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[7/4/26, 11:51:02 PM] Uncle Barnaby: ok
+[7/5/26, 6:26:37 AM] Aunt Clementine: Coffee is ready ☕
+[7/5/26, 7:06:04 AM] Uncle Barnaby: Traffic was fine
+[7/5/26, 7:12:23 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[7/5/26, 7:38:52 AM] Uncle Barnaby: k
+[7/6/26, 1:05:23 AM] Cousin Pip: hahaha
+[7/6/26, 1:16:47 AM] Gus Puddleworth: ‎This message was deleted.
+[7/6/26, 1:27:00 AM] Aunt Clementine: Anyone up for a garden day?
+[7/6/26, 1:31:35 AM] Cousin Pip: ‎sticker omitted
+[7/7/26, 6:54:57 PM] Uncle Barnaby: ok
+[7/7/26, 7:02:49 PM] Cousin Pip: ok but hear me out
+[7/7/26, 7:04:39 PM] Juniper Puddleworth: Omw
+[7/8/26, 7:28:52 AM] Aunt Clementine: Anyone up for a garden day?
+[7/8/26, 7:44:16 AM] Aunt Clementine: Anyone up for a garden day?
+[7/9/26, 2:08:12 AM] Cousin Pip: lol same
+[7/9/26, 2:08:58 AM] Juniper Puddleworth: Yes please!
+[7/9/26, 2:19:48 AM] Cousin Pip: cant sleep, anyone up?
+[7/9/26, 2:32:18 AM] Aunt Clementine: Happy Monday family ☀️
+[7/9/26, 2:34:14 AM] Juniper Puddleworth: Just landed ✈️
+[7/10/26, 7:42:13 AM] Aunt Clementine: Good morning everyone ☀️
+[7/10/26, 7:51:35 AM] Grandma Marigold: Sending hugs 🤗❤️
+[7/10/26, 7:54:09 AM] Juniper Puddleworth: haha yes!
+[7/10/26, 7:57:32 AM] Gus Puddleworth: Garage sale this weekend!
+[7/11/26, 12:41:31 PM] Uncle Barnaby: Traffic was fine
+[7/11/26, 12:50:21 PM] Cousin Pip: hahaha
+[7/11/26, 12:59:44 PM] Cousin Pip: i regret nothing 😂
+[7/11/26, 1:01:39 PM] Juniper Puddleworth: Saving you a seat
+[7/12/26, 5:02:10 AM] Aunt Clementine: Coffee is ready ☕
+[7/12/26, 5:17:43 AM] Gus Puddleworth: ‎This message was deleted.
+[7/12/26, 5:21:51 AM] Cousin Pip: ‎sticker omitted
+[7/12/26, 5:23:01 AM] Juniper Puddleworth: ‎image omitted
+[7/12/26, 5:27:42 AM] Cousin Pip: cant sleep, anyone up?
+[7/13/26, 10:54:34 PM] Cousin Pip: LOL that is so true 😂
+[7/13/26, 11:02:39 PM] Gus Puddleworth: Road trip!!!
+[7/13/26, 11:04:05 PM] Cousin Pip: LOL that is so true 😂
+[7/13/26, 11:15:42 PM] Grandma Marigold: Remember to call your mother!
+[7/14/26, 5:38:01 AM] Aunt Clementine: Coffee is ready ☕
+[7/14/26, 5:38:39 AM] Juniper Puddleworth: Ooh what time?
+[7/14/26, 5:45:36 AM] Cousin Pip: LOL that is so true 😂
+[7/15/26, 6:45:14 AM] Aunt Clementine: Anyone up for a garden day?
+[7/15/26, 7:01:16 AM] Gus Puddleworth: I fixed the gutter!!
+[7/15/26, 7:16:47 AM] Cousin Pip: lol
+[7/15/26, 7:18:33 AM] Juniper Puddleworth: ‎image omitted
+[7/15/26, 7:29:49 AM] Aunt Clementine: Coffee is ready ☕
+[7/16/26, 5:18:49 PM] Uncle Barnaby: ok see you then
+[7/16/26, 5:25:15 PM] Aunt Clementine: Good morning everyone ☀️
+[7/16/26, 5:30:13 PM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[7/16/26, 5:44:08 PM] Cousin Pip: night night 🌙
+[7/17/26, 10:44:11 PM] Cousin Pip: LOL that is so true 😂
+[7/17/26, 11:16:23 PM] Uncle Barnaby: ok see you then
+[7/17/26, 11:20:41 PM] Gus Puddleworth: Big news everyone!
+[7/17/26, 11:31:39 PM] Cousin Pip: this meme is us 😂😂
+[7/17/26, 11:33:24 PM] Juniper Puddleworth: Haha love it
+[7/18/26, 11:20:31 AM] Gus Puddleworth: ‎This message was deleted.
+[7/18/26, 11:25:00 AM] Grandma Marigold: I knitted three more scarves 🧣 who needs one?
+[7/19/26, 8:38:38 PM] Uncle Barnaby: k.
+[7/19/26, 8:53:37 PM] Grandma Marigold: Who borrowed my good pie dish? 🥧
+[7/20/26, 6:18:07 AM] Aunt Clementine: Anyone up for a garden day?
+[7/20/26, 6:26:22 AM] Grandma Marigold: Proud of you all ❤️❤️
+[7/20/26, 6:40:58 AM] Grandma Marigold: Who borrowed my good pie dish? 🥧
+[7/20/26, 6:44:10 AM] Gus Puddleworth: Big news everyone!
+[7/20/26, 6:45:19 AM] Juniper Puddleworth: Count me in 🙌
+[7/21/26, 6:12:41 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[7/21/26, 6:15:56 AM] Gus Puddleworth: ‎This message was deleted.
+[7/21/26, 6:34:55 AM] Uncle Barnaby: Ok
+[7/21/26, 6:44:09 AM] Gus Puddleworth: Big news everyone!
+[7/21/26, 6:53:51 AM] Uncle Barnaby: k
+[7/22/26, 12:32:09 AM] Cousin Pip: lmao
+[7/22/26, 12:33:01 AM] Juniper Puddleworth: Count me in 🙌
+[7/22/26, 12:34:58 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[7/23/26, 10:43:38 PM] Cousin Pip: new high score 🎮
+[7/23/26, 10:57:26 PM] Grandma Marigold: How do I make the text bigger on this phone?
+[7/24/26, 5:57:22 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[7/24/26, 6:10:02 AM] Gus Puddleworth: Go team!!! 🏈
+[7/24/26, 6:20:23 AM] Uncle Barnaby: k.
+[7/24/26, 6:43:37 AM] Uncle Barnaby: Ok
+[7/24/26, 6:57:46 AM] Gus Puddleworth: Big news everyone!
+[7/25/26, 8:40:45 AM] Grandma Marigold: Remember to call your mother!
+[7/25/26, 8:54:06 AM] Gus Puddleworth: ‎This message was deleted.
+[7/25/26, 9:07:02 AM] Cousin Pip: cant sleep, anyone up?
+[7/25/26, 9:24:01 AM] Uncle Barnaby: ok see you then
+[7/25/26, 9:26:40 AM] Juniper Puddleworth: Just landed ✈️
+[7/26/26, 6:25:42 AM] Aunt Clementine: Happy Monday family ☀️
+[7/26/26, 6:37:57 AM] Grandma Marigold: ‎image omitted
+[7/26/26, 6:47:35 AM] Cousin Pip: lol
+[7/26/26, 7:04:06 AM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[7/27/26, 6:14:43 AM] Aunt Clementine: Anyone up for a garden day?
+[7/27/26, 6:18:33 AM] Cousin Pip: night night 🌙
+[7/28/26, 4:10:45 PM] Gus Puddleworth: Best day ever!
+[7/28/26, 4:22:16 PM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[7/28/26, 4:35:49 PM] Cousin Pip: lmao
+[7/29/26, 10:35:38 AM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[7/29/26, 10:41:56 AM] Grandma Marigold: Love you all to the moon 🌙❤️
+[7/29/26, 10:49:37 AM] Aunt Clementine: Coffee is ready ☕
+[7/30/26, 7:50:00 AM] Aunt Clementine: Good morning everyone ☀️
+[7/30/26, 7:52:18 AM] Juniper Puddleworth: On my way!
+[7/31/26, 5:53:12 PM] Uncle Barnaby: Grill is fired up 🔥
+[7/31/26, 6:03:42 PM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[7/31/26, 6:36:25 PM] Uncle Barnaby: ok
+[8/1/26, 6:05:11 PM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[8/1/26, 6:08:19 PM] Cousin Pip: cant sleep, anyone up?
+[8/1/26, 6:11:31 PM] Gus Puddleworth: ‎This message was deleted.
+[8/2/26, 6:11:13 AM] Aunt Clementine: Anyone up for a garden day?
+[8/2/26, 6:19:35 AM] Grandma Marigold: Good morning my darlings ❤️
+[8/2/26, 6:20:41 AM] Juniper Puddleworth: Count me in 🙌
+[8/2/26, 6:25:49 AM] Grandma Marigold: How do I make the text bigger on this phone?
+[8/3/26, 12:03:28 AM] Cousin Pip: ‎sticker omitted
+[8/3/26, 12:07:45 AM] Gus Puddleworth: ‎This message was deleted.
+[8/3/26, 12:10:20 AM] Juniper Puddleworth: Haha love it
+[8/3/26, 12:12:43 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[8/4/26, 6:21:50 PM] Uncle Barnaby: k
+[8/4/26, 6:22:16 PM] Juniper Puddleworth: Omw
+[8/4/26, 6:26:26 PM] Cousin Pip: who ate the last cookie 😂
+[8/4/26, 6:27:40 PM] Juniper Puddleworth: Haha same
+[8/4/26, 7:12:23 PM] Uncle Barnaby: k
+[8/5/26, 5:29:38 PM] Uncle Barnaby: ok
+[8/5/26, 5:33:48 PM] Cousin Pip: lmao
+[8/6/26, 10:46:37 PM] Cousin Pip: lol
+[8/6/26, 11:26:37 PM] Uncle Barnaby: ok see you then
+[8/6/26, 11:28:44 PM] Juniper Puddleworth: Ooh what time?
+[8/7/26, 5:16:36 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[8/7/26, 5:16:56 AM] Juniper Puddleworth: Just landed ✈️
+[8/7/26, 5:26:19 AM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[8/7/26, 5:36:40 AM] Grandma Marigold: Sending hugs 🤗❤️
+[8/8/26, 1:52:29 PM] Juniper Puddleworth: ‎image omitted
+[8/8/26, 2:06:01 PM] Cousin Pip: ‎sticker omitted
+[8/9/26, 5:19:17 AM] Aunt Clementine: Good morning everyone ☀️
+[8/9/26, 5:55:12 AM] Uncle Barnaby: k
+[8/9/26, 6:25:48 AM] Uncle Barnaby: ok
+[8/9/26, 6:34:00 AM] Cousin Pip: cant sleep, anyone up?
+[8/10/26, 2:47:34 PM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[8/10/26, 3:19:51 PM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[8/11/26, 6:55:41 AM] Aunt Clementine: Anyone up for a garden day?
+[8/11/26, 7:10:19 AM] Cousin Pip: ‎GIF omitted
+[8/11/26, 7:37:43 AM] Uncle Barnaby: ok
+[8/11/26, 7:52:25 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[8/12/26, 6:30:52 AM] Aunt Clementine: Coffee is ready ☕
+[8/12/26, 6:42:47 AM] Cousin Pip: ‎sticker omitted
+[8/13/26, 5:19:12 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[8/13/26, 5:25:58 AM] Grandma Marigold: How do I make the text bigger on this phone?
+[8/13/26, 5:29:49 AM] Gus Puddleworth: Go team!!! 🏈
+[8/14/26, 1:10:43 AM] Cousin Pip: ‎sticker omitted
+[8/14/26, 1:24:48 AM] Gus Puddleworth: Who wants pancakes?!
+[8/14/26, 1:37:55 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[8/15/26, 6:41:00 AM] Aunt Clementine: Anyone up for a garden day?
+[8/15/26, 6:47:57 AM] Grandma Marigold: Sending hugs 🤗❤️
+[8/16/26, 7:29:53 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[8/16/26, 8:13:15 AM] Uncle Barnaby: ok
+[8/16/26, 8:17:50 AM] Cousin Pip: lol same
+[8/16/26, 8:31:00 AM] Aunt Clementine: Coffee is ready ☕
+[8/16/26, 8:44:55 AM] Gus Puddleworth: Pizza night!! 🍕
+[8/17/26, 5:12:33 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[8/17/26, 5:27:29 AM] Grandma Marigold: Good morning my darlings ❤️
+[8/17/26, 5:52:04 AM] Uncle Barnaby: ok
+[8/18/26, 2:20:22 AM] Cousin Pip: new high score 🎮
+[8/18/26, 2:27:50 AM] Grandma Marigold: Love you all to the moon 🌙❤️
+[8/18/26, 2:43:28 AM] Aunt Clementine: Coffee is ready ☕
+[8/18/26, 2:57:42 AM] Gus Puddleworth: Pizza night!! 🍕
+[8/19/26, 5:33:50 AM] Aunt Clementine: Happy Monday family ☀️
+[8/19/26, 5:35:59 AM] Juniper Puddleworth: Totally
+[8/19/26, 5:47:35 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[8/19/26, 6:02:50 AM] Cousin Pip: ok but hear me out
+[8/19/26, 6:16:19 AM] Grandma Marigold: Good morning my darlings ❤️
+[8/20/26, 2:44:07 AM] Cousin Pip: hahaha
+[8/20/26, 2:49:39 AM] Gus Puddleworth: Go team!!! 🏈
+[8/21/26, 7:28:12 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[8/21/26, 8:01:59 AM] Uncle Barnaby: Traffic was fine
+[8/22/26, 12:37:39 AM] Cousin Pip: hahaha
+[8/22/26, 12:38:48 AM] Juniper Puddleworth: ‎image omitted
+[8/22/26, 12:52:51 AM] Gus Puddleworth: Road trip!!!
+[8/22/26, 1:26:08 AM] Uncle Barnaby: k
+[8/22/26, 1:30:15 AM] Aunt Clementine: Anyone up for a garden day?
+[8/23/26, 8:25:25 PM] Uncle Barnaby: ok
+[8/23/26, 8:31:43 PM] Cousin Pip: ‎sticker omitted
+[8/23/26, 9:11:14 PM] Uncle Barnaby: Traffic was fine
+[8/24/26, 5:54:29 PM] Uncle Barnaby: Ok
+[8/24/26, 5:57:24 PM] Cousin Pip: LOL that is so true 😂
+[8/24/26, 6:10:58 PM] Grandma Marigold: Good morning my darlings ❤️
+[8/24/26, 6:22:01 PM] Gus Puddleworth: Best day ever!
+[8/24/26, 6:32:56 PM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[8/25/26, 5:19:29 AM] Aunt Clementine: Coffee is ready ☕
+[8/25/26, 5:20:17 AM] Juniper Puddleworth: Omw
+[8/26/26, 5:04:14 AM] Aunt Clementine: Weather looks lovely today
+[8/26/26, 5:19:15 AM] Gus Puddleworth: ‎This message was deleted.
+[8/26/26, 5:32:49 AM] Gus Puddleworth: Go team!!! 🏈
+[8/26/26, 5:36:11 AM] Aunt Clementine: Good morning everyone ☀️
+[8/27/26, 7:32:59 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[8/27/26, 7:41:40 AM] Aunt Clementine: Happy Monday family ☀️
+[8/27/26, 7:48:17 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[8/27/26, 8:33:44 AM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[8/27/26, 8:50:09 AM] Cousin Pip: ‎sticker omitted
+[8/28/26, 9:10:05 AM] Juniper Puddleworth: ‎image omitted
+[8/28/26, 9:14:20 AM] Grandma Marigold: Good morning my darlings ❤️
+[8/28/26, 9:15:05 AM] Juniper Puddleworth: Haha same
+[8/28/26, 9:27:36 AM] Cousin Pip: ‎sticker omitted
+[8/28/26, 9:33:14 AM] Cousin Pip: this meme is us 😂😂
+[8/29/26, 1:32:48 PM] Juniper Puddleworth: Just landed ✈️
+[8/29/26, 1:57:16 PM] Uncle Barnaby: Grill is fired up 🔥
+[8/29/26, 2:30:25 PM] Uncle Barnaby: ok
+[8/29/26, 2:38:56 PM] Grandma Marigold: How do I make the text bigger on this phone?
+[8/30/26, 7:29:12 PM] Gus Puddleworth: Garage sale this weekend!
+[8/30/26, 7:38:43 PM] Cousin Pip: ok but hear me out
+[8/30/26, 7:50:50 PM] Aunt Clementine: Good morning everyone ☀️
+[8/30/26, 8:00:44 PM] Gus Puddleworth: Pizza night!! 🍕
+[8/31/26, 5:11:32 AM] Aunt Clementine: Coffee is ready ☕
+[8/31/26, 5:17:50 AM] Cousin Pip: ‎sticker omitted
+[8/31/26, 5:32:29 AM] Grandma Marigold: Proud of you all ❤️❤️
+[8/31/26, 5:33:16 AM] Juniper Puddleworth: ‎image omitted
+[8/31/26, 5:48:30 AM] Gus Puddleworth: ‎This message was deleted.
+[9/1/26, 6:30:45 AM] Aunt Clementine: Weather looks lovely today
+[9/1/26, 6:34:02 AM] Grandma Marigold: I knitted three more scarves 🧣 who needs one?
+[9/1/26, 6:34:57 AM] Juniper Puddleworth: On my way!
+[9/1/26, 6:43:29 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[9/1/26, 6:54:48 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[9/2/26, 6:16:15 PM] Uncle Barnaby: Grill is fired up 🔥
+[9/2/26, 6:21:10 PM] Gus Puddleworth: Who wants pancakes?!
+[9/2/26, 6:25:28 PM] Cousin Pip: lmao
+[9/3/26, 6:18:00 AM] Aunt Clementine: Anyone up for a garden day?
+[9/3/26, 6:25:28 AM] Gus Puddleworth: ‎This message was deleted.
+[9/4/26, 5:35:05 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[9/4/26, 5:43:19 AM] Cousin Pip: lmao
+[9/4/26, 5:44:44 AM] Juniper Puddleworth: Totally
+[9/4/26, 6:21:05 AM] Uncle Barnaby: ok
+[9/4/26, 6:27:36 AM] Aunt Clementine: Coffee is ready ☕
+[9/5/26, 5:15:32 AM] Aunt Clementine: Anyone up for a garden day?
+[9/5/26, 5:29:28 AM] Cousin Pip: new high score 🎮
+[9/5/26, 5:31:26 AM] Juniper Puddleworth: Omw
+[9/5/26, 5:38:50 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[9/6/26, 7:38:31 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[9/6/26, 7:46:42 AM] Grandma Marigold: Did everyone eat breakfast?
+[9/7/26, 6:23:11 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[9/7/26, 6:23:39 AM] Juniper Puddleworth: Just landed ✈️
+[9/7/26, 6:24:38 AM] Juniper Puddleworth: Haha love it
+[9/7/26, 6:35:38 AM] Uncle Barnaby: k
+[9/8/26, 9:40:28 PM] Juniper Puddleworth: Ooh what time?
+[9/8/26, 9:43:59 PM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[9/8/26, 9:49:44 PM] Cousin Pip: i regret nothing 😂
+[9/9/26, 9:08:31 PM] Juniper Puddleworth: Ooh what time?
+[9/9/26, 9:25:09 PM] Cousin Pip: LOL that is so true 😂
+[9/9/26, 9:35:38 PM] Aunt Clementine: Anyone up for a garden day?
+[9/9/26, 9:45:52 PM] Cousin Pip: LOL that is so true 😂
+[9/9/26, 9:48:31 PM] Aunt Clementine: Coffee is ready ☕
+[9/10/26, 6:09:10 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[9/10/26, 6:13:44 AM] Grandma Marigold: Good morning my darlings ❤️
+[9/10/26, 6:56:40 AM] Uncle Barnaby: Grill is fired up 🔥
+[9/10/26, 6:58:12 AM] Juniper Puddleworth: Totally
+[9/11/26, 6:39:11 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[9/11/26, 6:54:10 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[9/11/26, 7:38:44 AM] Uncle Barnaby: ok
+[9/12/26, 5:55:48 AM] Aunt Clementine: Happy Monday family ☀️
+[9/12/26, 5:56:33 AM] Juniper Puddleworth: Haha same
+[9/12/26, 7:21:29 AM] Grandma Marigold: Sending hugs 🤗❤️
+[9/12/26, 7:28:30 AM] Gus Puddleworth: Pizza night!! 🍕
+[9/12/26, 7:44:13 AM] Cousin Pip: i regret nothing 😂
+[9/12/26, 7:46:19 AM] Juniper Puddleworth: ‎image omitted
+[9/12/26, 8:01:16 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[9/12/26, 8:01:50 AM] Juniper Puddleworth: Haha same
+[9/12/26, 8:41:41 AM] Uncle Barnaby: Ok
+[9/12/26, 8:49:11 AM] Gus Puddleworth: I fixed the gutter!!
+[9/12/26, 8:50:53 AM] Juniper Puddleworth: haha yes!
+[9/12/26, 8:58:04 AM] Cousin Pip: i regret nothing 😂
+[9/12/26, 9:07:45 AM] Grandma Marigold: Good morning my darlings ❤️
+[9/12/26, 9:16:09 AM] Uncle Barnaby: ok see you then
+[9/12/26, 9:17:58 AM] Juniper Puddleworth: Totally
+[9/12/26, 9:24:49 AM] Grandma Marigold: How do I make the text bigger on this phone?
+[9/12/26, 9:47:27 AM] Uncle Barnaby: ok
+[9/13/26, 11:12:13 PM] Cousin Pip: ok but hear me out
+[9/13/26, 11:50:13 PM] Uncle Barnaby: ok
+[9/14/26, 11:08:00 PM] Cousin Pip: night night 🌙
+[9/14/26, 11:22:19 PM] Grandma Marigold: Good morning my darlings ❤️
+[9/15/26, 6:57:35 AM] Aunt Clementine: Anyone up for a garden day?
+[9/15/26, 6:59:19 AM] Cousin Pip: cant sleep, anyone up?
+[9/16/26, 6:11:56 AM] Aunt Clementine: Weather looks lovely today
+[9/16/26, 6:24:49 AM] Grandma Marigold: Proud of you all ❤️❤️
+[9/16/26, 6:36:59 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[9/16/26, 6:37:29 AM] Juniper Puddleworth: Totally
+[9/17/26, 6:03:55 AM] Aunt Clementine: Weather looks lovely today
+[9/17/26, 6:08:13 AM] Cousin Pip: ‎GIF omitted
+[9/17/26, 6:23:06 AM] Aunt Clementine: Weather looks lovely today
+[9/17/26, 6:24:26 AM] Juniper Puddleworth: Haha love it
+[9/17/26, 6:30:22 AM] Aunt Clementine: Anyone up for a garden day?
+[9/18/26, 1:26:16 AM] Cousin Pip: i regret nothing 😂
+[9/18/26, 1:32:14 AM] Gus Puddleworth: Garage sale this weekend!
+[9/18/26, 1:42:08 AM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[9/19/26, 5:57:11 PM] Uncle Barnaby: k.
+[9/19/26, 5:58:47 PM] Juniper Puddleworth: Totally
+[9/20/26, 10:55:56 PM] Cousin Pip: lol
+[9/20/26, 11:03:37 PM] Grandma Marigold: ‎image omitted
+[9/20/26, 11:11:50 PM] Grandma Marigold: Love you all to the moon 🌙❤️
+[9/21/26, 5:01:19 AM] Aunt Clementine: Coffee is ready ☕
+[9/21/26, 5:03:10 AM] Juniper Puddleworth: ‎image omitted
+[9/22/26, 3:07:24 AM] Cousin Pip: ok but hear me out
+[9/22/26, 3:15:37 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[9/22/26, 3:30:57 AM] Cousin Pip: who ate the last cookie 😂
+[9/22/26, 3:37:45 AM] Gus Puddleworth: Best day ever!
+[9/23/26, 4:14:51 PM] Gus Puddleworth: Who wants pancakes?!
+[9/23/26, 4:25:44 PM] Uncle Barnaby: ok
+[9/23/26, 4:29:04 PM] Grandma Marigold: Is it supposed to rain on Saturday?
+[9/24/26, 5:08:59 PM] Uncle Barnaby: Traffic was fine
+[9/24/26, 5:15:55 PM] Gus Puddleworth: I fixed the gutter!!
+[9/24/26, 5:22:06 PM] Aunt Clementine: Who is hosting Sunday dinner?
+[9/24/26, 5:23:06 PM] Juniper Puddleworth: haha yes!
+[9/25/26, 6:06:57 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[9/25/26, 6:44:56 AM] Uncle Barnaby: Traffic was fine
+[9/25/26, 6:46:54 AM] Juniper Puddleworth: ‎image omitted
+[9/25/26, 7:01:44 AM] Aunt Clementine: Weather looks lovely today
+[9/26/26, 1:00:15 AM] Cousin Pip: ‎sticker omitted
+[9/26/26, 1:09:13 AM] Gus Puddleworth: Garage sale this weekend!
+[9/26/26, 1:15:51 AM] Grandma Marigold: How do I make the text bigger on this phone?
+[9/26/26, 1:55:26 AM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[9/26/26, 2:17:25 AM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[9/27/26, 11:27:29 AM] Gus Puddleworth: Who wants pancakes?!
+[9/27/26, 11:30:14 AM] Grandma Marigold: Remember to call your mother!
+[9/28/26, 11:51:12 PM] Cousin Pip: lol same
+[9/29/26, 12:33:03 AM] Uncle Barnaby: k
+[9/29/26, 12:35:00 AM] Aunt Clementine: Happy Monday family ☀️
+[9/29/26, 12:37:59 AM] Cousin Pip: lmao
+[9/29/26, 11:02:16 PM] Cousin Pip: LOL that is so true 😂
+[9/29/26, 11:16:45 PM] Grandma Marigold: Good morning my darlings ❤️
+[9/29/26, 11:18:59 PM] Juniper Puddleworth: haha yes!
+[9/30/26, 6:11:25 AM] Aunt Clementine: Reminder: Grandma's birthday is next week 🎂
+[9/30/26, 6:20:48 AM] Cousin Pip: ok but hear me out
+[9/30/26, 6:30:53 AM] Aunt Clementine: Coffee is ready ☕
+[9/30/26, 6:32:21 AM] Juniper Puddleworth: On my way!
+[10/2/26, 10:36:56 PM] Cousin Pip: night night 🌙
+[10/2/26, 10:40:56 PM] Cousin Pip: lol
+[10/6/26, 2:18:06 AM] Cousin Pip: ‎sticker omitted
+[10/6/26, 2:19:40 AM] Juniper Puddleworth: Totally
+[10/6/26, 2:27:28 AM] Grandma Marigold: Good morning my darlings ❤️
+[10/6/26, 2:34:59 AM] Gus Puddleworth: ‎This message was deleted.
+[10/15/26, 5:45:45 AM] Aunt Clementine: Happy Monday family ☀️
+[10/15/26, 5:54:50 AM] Grandma Marigold: Proud of you all ❤️❤️
+[10/17/26, 6:45:00 AM] Aunt Clementine: Who is hosting Sunday dinner?
+[10/17/26, 7:00:07 AM] Cousin Pip: this meme is us 😂😂
+[10/20/26, 5:39:28 AM] Aunt Clementine: Happy Monday family ☀️
+[10/20/26, 5:40:43 AM] Juniper Puddleworth: haha yes!
+[10/20/26, 5:54:35 AM] Aunt Clementine: Happy Monday family ☀️
+[10/20/26, 6:08:01 AM] Grandma Marigold: The cardinals are back at the feeder 🐦
+[10/26/26, 6:46:53 PM] Uncle Barnaby: k
+[10/26/26, 7:02:24 PM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[10/29/26, 6:16:11 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[10/29/26, 6:18:48 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[10/29/26, 6:30:07 AM] Gus Puddleworth: I fixed the gutter!!
+[10/29/26, 6:44:44 AM] Cousin Pip: i regret nothing 😂
+[11/4/26, 7:56:23 AM] Grandma Marigold: I knitted three more scarves 🧣 who needs one?
+[11/4/26, 7:57:25 AM] Juniper Puddleworth: Haha love it
+[11/4/26, 8:00:57 AM] Aunt Clementine: Morning walk done! 5 miles 🚶‍♀️
+[11/7/26, 7:24:07 PM] Gus Puddleworth: I fixed the gutter!!
+[11/7/26, 7:55:55 PM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[11/7/26, 8:04:44 PM] Grandma Marigold: I made too much soup again, who wants some? 🥰
+[11/13/26, 1:14:16 AM] Cousin Pip: ‎sticker omitted
+[11/13/26, 1:18:52 AM] Aunt Clementine: Good morning everyone ☀️
+[11/13/26, 1:25:59 AM] Grandma Marigold: Is it supposed to rain on Saturday?
+[11/13/26, 1:31:44 AM] Cousin Pip: night night 🌙
+[11/13/26, 1:34:01 AM] Juniper Puddleworth: Count me in 🙌
+[11/14/26, 3:12:57 PM] Grandma Marigold: Okay here is the cranberry sauce recipe everyone asked for:
+1 bag of cranberries
+1 cup of sugar
+1 cup of orange juice
+Simmer until they pop, about 10 minutes. Stir with love ❤️
+Do NOT use the can, Barnaby 🥰
+[11/19/26, 5:21:09 AM] Aunt Clementine: Anyone up for a garden day?
+[11/19/26, 6:01:36 AM] Uncle Barnaby: k.
+[11/19/26, 6:46:17 AM] Uncle Barnaby: Why did the scarecrow win an award? Because he was outstanding in his field
+[11/19/26, 6:58:18 AM] Aunt Clementine: Coffee is ready ☕
+[11/20/26, 6:24:00 AM] Aunt Clementine: Good morning everyone ☀️
+[11/20/26, 6:29:25 AM] Cousin Pip: LOL that is so true 😂
+[11/20/26, 6:41:19 AM] Aunt Clementine: Anyone up for a garden day?
+[11/20/26, 6:43:06 AM] Juniper Puddleworth: Totally
+[11/20/26, 6:50:44 AM] Cousin Pip: lol
+</script><!--SAMPLE-END-->
+<script src="wrapped.js"></script>
+</body>
+</html>

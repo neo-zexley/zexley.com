@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src 'none'; form-action 'none'; base-uri 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Group Chat Wrapped 2026 — Zexley</title>
-<meta name="description" content="Turn your WhatsApp group chat export into a year-in-review recap with kind, funny group awards. Runs entirely on your device. Not affiliated with WhatsApp, Meta, or Spotify.">
+<meta name="description" content="Turn your WhatsApp or Telegram group chat export into a year-in-review recap with kind, funny group awards. Runs entirely on your device. Not affiliated with WhatsApp, Meta, Telegram, or Spotify.">
 <link rel="icon" href="data:,">
 <style>
 :root{--paper:#f3eee4;--ink:#1a1814;--muted:#5c564c;--ember:#b03c14;--ember-dark:#8a2e10;--line:#d4c9b6;--card:#fffaf2;--pine:#12352a;--gold:#d9a441;
@@ -107,7 +107,7 @@ background:radial-gradient(circle at 20% 10%,rgba(217,164,65,.28),transparent 40
     <div class="hero">
       <p class="kicker">🎄 Family &amp; friends edition</p>
       <h1 data-brand>Group Chat Wrapped 2026</h1>
-      <p class="lede">Drop in a WhatsApp group chat export and get a year-in-review slide deck: who talked most, your busiest day, emoji of the year, and up to 12 kind, silly group awards.</p>
+      <p class="lede">Drop in a WhatsApp or Telegram (Desktop JSON export) group chat export and get a year-in-review slide deck: who talked most, your busiest day, emoji of the year, and up to 12 kind, silly group awards.</p>
       <p class="small">An AI-assisted product made by Zexley. No AI reads your chat: the stats come from plain code running on your device.</p>
     </div>
 
@@ -117,8 +117,8 @@ background:radial-gradient(circle at 20% 10%,rgba(217,164,65,.28),transparent 40
     </div>
 
     <div class="drop" id="drop">
-      <p style="margin:0 0 .4rem">Drag your exported chat here (<b>.txt</b> or <b>.zip</b>)</p>
-      <input type="file" id="file" accept=".txt,.zip,text/plain,application/zip">
+      <p style="margin:0 0 .4rem">Drag your exported chat here (WhatsApp <b>.txt</b> or <b>.zip</b>, or Telegram <b>result.json</b>)</p>
+      <input type="file" id="file" accept=".txt,.zip,.json,text/plain,application/zip,application/json">
       <label for="file">or choose a file</label>
       <p class="or">— or —</p>
       <button class="btn" id="sample" type="button">Try with a sample chat</button>
@@ -133,6 +133,16 @@ background:radial-gradient(circle at 20% 10%,rgba(217,164,65,.28),transparent 40
         <li><b>iPhone:</b> tap the group name → <i>Export Chat</i> → <i>Without Media</i>. <b>Android:</b> ⋮ menu → <i>More</i> → <i>Export chat</i> → <i>Without media</i>.</li>
         <li>Save the file to your phone or computer (Files app, Drive, or email it to yourself).</li>
         <li>Drop the <b>.zip</b> or <b>.txt</b> here. A zip is opened right here in your browser. If your browser can’t, unzip it and drop the <b>_chat.txt</b> inside.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>How to export a Telegram chat</h2>
+      <ol>
+        <li>Open the group chat in the <b>Telegram Desktop</b> app on a computer.</li>
+        <li>Click the <b>⋮</b> menu at the top right → <i>Export chat history</i>.</li>
+        <li>Untick photos, videos and other media (they aren’t needed) and set <i>Format</i> to <b>Machine-readable JSON</b>. Then click <i>Export</i>.</li>
+        <li>Drop the <b>result.json</b> from the export folder here (or a <b>.zip</b> of that folder). The HTML format won’t work.</li>
       </ol>
     </div>
 
@@ -152,8 +162,8 @@ background:radial-gradient(circle at 20% 10%,rgba(217,164,65,.28),transparent 40
       <details><summary>Is the $4.99 a subscription?</summary><p>No. It’s a one-time payment, not a subscription. If the unlock doesn’t work or you’re unhappy, email neo@zexley.com within 14 days of purchase and we’ll refund the $4.99. You don’t need to send us your chat. Payment is handled by Stripe on its own checkout page.</p></details>
       <details><summary>What is saved on my device when I unlock?</summary><p>Checkout happens on Stripe’s page, so before you go we save the finished stats (group and member names, counts, top words and emoji, and the awards) in this browser’s local storage. Your messages are never saved. When Stripe sends you back, the full recap opens unlocked. The saved stats are deleted after 2 hours if you don’t pay, 24 hours after you pay, or when you press “Forget my recap now”. Nothing is sent to us.</p></details>
       <details><summary>Who made this?</summary><p>Zexley, an assumed business name of Bloom Commerce LLC (Indiana). Zexley is AI-run: this product, its code and its copy were made with AI assistance. No AI reads your chat — the stats come from ordinary code running in your browser.</p></details>
-      <details><summary>Is this an official WhatsApp product?</summary><p>No. <span data-brand>Group Chat Wrapped 2026</span> is not affiliated with, endorsed by, or connected to WhatsApp, Meta, or Spotify. It just reads the export file WhatsApp lets you create.</p></details>
-      <details><summary>Does it work with iMessage, Telegram or Signal?</summary><p>Not yet. WhatsApp exports only for now.</p></details>
+      <details><summary>Is this an official WhatsApp or Telegram product?</summary><p>No. <span data-brand>Group Chat Wrapped 2026</span> is not affiliated with, endorsed by, or connected to WhatsApp, Meta, Telegram, or Spotify. It just reads the export file WhatsApp or Telegram lets you create.</p></details>
+      <details><summary>Does it work with Telegram, iMessage or Signal?</summary><p>Telegram: yes, with a chat exported from Telegram Desktop in the “Machine-readable JSON” format. iMessage and Signal: not yet.</p></details>
       <details><summary>Some numbers look off.</summary><p>Exports vary by phone, language and settings, so counts can be imperfect. If the chat has 2026 messages we count 2026 only; otherwise we count everything and say so.</p></details>
     </div>
   </section>
@@ -185,7 +195,7 @@ background:radial-gradient(circle at 20% 10%,rgba(217,164,65,.28),transparent 40
 </main>
 
 <footer><div class="wrap">
-  <p>Made by Zexley with AI assistance. Zexley is an assumed business name of Bloom Commerce LLC (Indiana). Stats are computed by code; awards are for fun. Not affiliated with, endorsed by, or connected to WhatsApp, Meta, or Spotify.</p>
+  <p>Made by Zexley with AI assistance. Zexley is an assumed business name of Bloom Commerce LLC (Indiana). Stats are computed by code; awards are for fun. Not affiliated with, endorsed by, or connected to WhatsApp, Meta, Telegram, or Spotify.</p>
   <p><a href="../privacy.html">Privacy</a> · <a href="../terms.html">Terms</a> · neo@zexley.com · made at zexley.com</p>
 </div></footer>
 

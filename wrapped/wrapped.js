@@ -1,6 +1,7 @@
 /*
  * Group Chat Wrapped 2026 (BRAND_NAME below) — Zexley (assumed name of Bloom Commerce LLC)
- * Not affiliated with WhatsApp, Meta, or Spotify.
+ * Not affiliated with WhatsApp, Meta, Telegram, or Spotify.
+ * Reads WhatsApp "Export chat" text files and Telegram Desktop "Machine-readable JSON" exports.
  * UNPUBLISHED PROTOTYPE. Everything runs in the browser. This file makes NO network
  * requests: no fetch, no XHR, no beacons, no analytics, no external fonts.
  * The page's Content-Security-Policy (connect-src 'none') also blocks them.
@@ -111,6 +112,14 @@
       var body = e.body, sender = null, txt = body;
       var ci = body.indexOf(': ');
       if (ci > 0 && ci <= 80) { sender = body.slice(0, ci).replace(/^~\s*/, '').trim(); txt = body.slice(ci + 2); }
+      // Android system notices have no "Name: " prefix. A colon inside the
+      // notice (e.g. Ann changed the subject from "Trip: 2025" to "Fam")
+      // was being read as a fake member. Undo that when the extracted
+      // "sender" itself looks like a system line.
+      if (sender && SYSTEM_RE.test(body) && SYSTEM_RE.test(sender)) {
+        sender = null;
+        txt = body;
+      }
       txt = txt.replace(EDITED_RE, '').replace(/\s+$/, '');
       var trimmed = txt.trim();
       var type = 'text';
@@ -127,7 +136,72 @@
       msgs.push({ t: t, y: y, mo: mo, d: d, h: h, mi: e.mi, sender: type === 'system' ? null : sender, text: trimmed, type: type });
     }
     msgs.sort(function (a, b) { return a.t - b.t; });
-    return { messages: msgs, dateOrder: order, groupName: groupName };
+    return { messages: msgs, dateOrder: order, groupName: groupName, format: 'whatsapp' };
+  }
+
+  // ---------- Telegram (Telegram Desktop "Export chat history", format "Machine-readable JSON") ----------
+  // result.json: { name, type, id, messages: [{ id, type: 'message'|'service', date: '2026-01-05T14:03:11',
+  //   date_unixtime, from, from_id, text: string | [string | {type, text}], media_type?, photo?, file?,
+  //   sticker_emoji?, ... }] }. Each message is mapped onto the same shape parseChat() returns,
+  // so every stat and award works unchanged. Service messages (joins, pins, title changes, calls) are skipped.
+  function friendly(msg) { var e = new Error(msg); e.friendly = true; return e; }
+  var TG_DATE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/;
+  var TG_MEDIA_KEYS = ['photo', 'file', 'location_information', 'contact_information', 'poll', 'game_title', 'invoice_information'];
+  function flattenTgText(t) {
+    if (t == null) return '';
+    if (typeof t === 'string') return t;
+    if (Array.isArray(t)) return t.map(function (p) { return typeof p === 'string' ? p : (p && typeof p.text === 'string' ? p.text : ''); }).join('');
+    if (typeof t === 'object' && typeof t.text === 'string') return t.text;
+    return '';
+  }
+  function parseTelegram(data) {
+    if (typeof data === 'string') {
+      try { data = JSON.parse(data.replace(/^\ufeff/, '')); }
+      catch (err) { throw friendly('That file looks like JSON, but it could not be read. It may be cut off or damaged. Export the chat from Telegram Desktop again (format: "Machine-readable JSON") and drop the result.json.'); }
+    }
+    if (!data || typeof data !== 'object') throw friendly('That JSON file is not a Telegram chat export.');
+    if (!Array.isArray(data.messages)) {
+      if (data.chats || data.personal_information) throw friendly('That looks like a full Telegram account export. Export just one chat instead: open the chat in Telegram Desktop, choose "Export chat history", and pick "Machine-readable JSON".');
+      throw friendly('That JSON file is not a Telegram chat export (no "messages" list). In Telegram Desktop, open the chat, choose "Export chat history", and pick "Machine-readable JSON".');
+    }
+    var msgs = [];
+    data.messages.forEach(function (m) {
+      if (!m || typeof m !== 'object' || m.type !== 'message') return; // skip service messages and anything unknown
+      var dm = TG_DATE.exec(String(m.date || '')), y, mo, d, h, mi, sec;
+      if (dm) { y = +dm[1]; mo = +dm[2]; d = +dm[3]; h = +dm[4]; mi = +dm[5]; sec = +(dm[6] || 0); }
+      else if (isFinite(+m.date_unixtime) && +m.date_unixtime > 0) {
+        // Fallback only: unix time is UTC, while "date" is the exporting computer's local time.
+        var dt = new Date(+m.date_unixtime * 1000);
+        y = dt.getUTCFullYear(); mo = dt.getUTCMonth() + 1; d = dt.getUTCDate(); h = dt.getUTCHours(); mi = dt.getUTCMinutes(); sec = dt.getUTCSeconds();
+      } else return;
+      if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59) return;
+      var sender = m.from != null && String(m.from).trim() ? clean(String(m.from)).trim() : (m.from_id ? 'Deleted Account' : null);
+      if (!sender) return;
+      var text = clean(flattenTgText(m.text)).replace(/\s+$/, '').trim();
+      var type = 'text';
+      if (m.media_type === 'sticker' || (m.sticker_emoji && !m.photo)) type = 'sticker';
+      else if (m.media_type || TG_MEDIA_KEYS.some(function (k) { return m[k] != null; })) type = 'media';
+      msgs.push({ t: Date.UTC(y, mo - 1, d, h, mi, sec), y: y, mo: mo, d: d, h: h, mi: mi, sender: sender, text: text, type: type });
+    });
+    msgs.sort(function (a, b) { return a.t - b.t; });
+    var name = typeof data.name === 'string' && data.name.trim() ? clean(data.name).trim() : null;
+    return { messages: msgs, dateOrder: 'ymd', groupName: name, format: 'telegram' };
+  }
+
+  // Picks the parser by content, not by file name: JSON with a messages list = Telegram, else WhatsApp text.
+  function detectFormat(text) {
+    var body = String(text || '').replace(/^[\ufeff\s]+/, ''), head = body.slice(0, 200);
+    if (head.charAt(0) === '{') return 'telegram';
+    // "[" can start a JSON array or an iOS WhatsApp line like "[12/24/25, 9:14 PM] ..."; only real JSON counts.
+    if (head.charAt(0) === '[') { try { JSON.parse(body); return 'telegram'; } catch (e) { return 'whatsapp'; } }
+    if (/^<(!doctype html|html)/i.test(head)) return 'html';
+    return 'whatsapp';
+  }
+  function parseAny(text) {
+    var f = detectFormat(text);
+    if (f === 'telegram') return parseTelegram(String(text));
+    if (f === 'html') throw friendly('That looks like a web page, such as Telegram\'s HTML export. Export the chat again in Telegram Desktop and choose the format "Machine-readable JSON", then drop the result.json.');
+    return parseChat(text);
   }
 
   // ---------- Stats ----------
@@ -282,15 +356,18 @@
       entries.push({ name: name, method: u16(b, off + 10), csize: u32(b, off + 20), local: u32(b, off + 42) });
       off += 46 + nameLen + extraLen + comLen;
     }
-    var e = entries.filter(function (x) { return /(^|\/)_chat\.txt$/i.test(x.name); })[0] || entries.filter(function (x) { return /\.txt$/i.test(x.name) && !/^__MACOSX/.test(x.name); })[0];
-    if (!e) return Promise.reject(new Error('No _chat.txt found inside the zip.'));
+    var real = entries.filter(function (x) { return !/(^|\/)__MACOSX\//.test(x.name) && !/(^|\/)\._/.test(x.name); });
+    var e = real.filter(function (x) { return /(^|\/)_chat\.txt$/i.test(x.name); })[0]
+      || real.filter(function (x) { return /(^|\/)result\.json$/i.test(x.name); }).sort(function (a, b) { return a.name.length - b.name.length; })[0]
+      || real.filter(function (x) { return /\.txt$/i.test(x.name); })[0];
+    if (!e) return Promise.reject(new Error('No WhatsApp _chat.txt or Telegram result.json found inside the zip.'));
     var lo = e.local;
     if (u32(b, lo) !== 0x04034b50) return Promise.reject(new Error('Zip entry is damaged.'));
     var start = lo + 30 + u16(b, lo + 26) + u16(b, lo + 28);
     var data = b.subarray(start, start + e.csize);
     if (e.method === 0) return Promise.resolve(new TextDecoder().decode(data));
     if (e.method !== 8) return Promise.reject(new Error('Unsupported zip compression.'));
-    if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('Your browser cannot unzip here. Unzip the file and drop the _chat.txt instead.'));
+    if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('Your browser cannot unzip here. Unzip the file and drop the _chat.txt (WhatsApp) or result.json (Telegram) instead.'));
     var ds = new DecompressionStream('deflate-raw');
     var stream = new Blob([data]).stream().pipeThrough(ds);
     return new Response(stream).arrayBuffer().then(function (ab) { return new TextDecoder().decode(ab); });
@@ -357,7 +434,7 @@
   }
   function paymentUrl(ref) { return PAYMENT_LINK + (PAYMENT_LINK.indexOf('?') >= 0 ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(ref); }
 
-  var api = { parseChat: parseChat, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, inferDateOrder: inferDateOrder, AWARDS: AWARDS, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl };
+  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, inferDateOrder: inferDateOrder, AWARDS: AWARDS, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
   root.Wrapped = api;
 
@@ -372,13 +449,15 @@
   function setStatus(msg, isErr) { var s = $('#status'); s.textContent = msg; s.className = 'status' + (isErr ? ' err' : ''); }
 
   function handleText(text, label) {
-    var parsed = parseChat(text);
-    if (!parsed.groupName && label) {
+    var parsed;
+    try { parsed = parseAny(text); }
+    catch (err) { setStatus(err && err.friendly ? err.message : 'Could not read that file.', true); return; }
+    if (!parsed.groupName && label && parsed.format === 'whatsapp') {
       var m = /WhatsApp Chat (?:with |- )(.+?)(?:\.txt|\.zip)?$/i.exec(label);
       if (m) parsed.groupName = m[1];
     }
     var S = computeStats(parsed);
-    if (S.empty) { setStatus('We could not find any WhatsApp messages in that file. Make sure it is a WhatsApp "Export chat" file (.txt or .zip).', true); return; }
+    if (S.empty) { setStatus((parsed.format === 'telegram' ? 'We could not find any messages in that Telegram export. Make sure it is a group or chat export from Telegram Desktop in the "Machine-readable JSON" format.' : 'We could not find any chat messages in that file. Make sure it is a WhatsApp "Export chat" file (.txt or .zip) or a Telegram Desktop JSON export (result.json).'), true); return; }
     state.stats = S;
     state.unlocked = state.paidMarker;
     showDeck(S);
@@ -396,10 +475,12 @@
   function handleFile(file) {
     if (!file) return;
     setStatus('Reading on your device…');
-    var isZip = /\.zip$/i.test(file.name) || file.type === 'application/zip';
+    var isZip = /\.zip$/i.test(file.name) || /zip/i.test(file.type || '');
     var reader = new FileReader();
     reader.onerror = function () { setStatus('Could not read that file.', true); };
     reader.onload = function () {
+      var b = new Uint8Array(reader.result, 0, Math.min(4, reader.result.byteLength));
+      if (b.length === 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 3 && b[3] === 4) isZip = true; // "PK\3\4" = zip, whatever the name
       if (isZip) {
         readZipChat(reader.result).then(function (t) { handleText(t, file.name); }, function (err) { setStatus(err.message, true); });
       } else {
@@ -491,7 +572,7 @@
     var ul2 = el('ul', 'sum-awards');
     S.awards.slice(0, 6).forEach(function (a) { ul2.appendChild(el('li', null, a.emoji + ' ' + a.title + ': ' + a.winner)); });
     ss.inner.appendChild(ul2);
-    ss.inner.appendChild(el('p', 'slide-foot', 'made at zexley.com · stats computed by code, awards for fun · not affiliated with WhatsApp, Meta, or Spotify'));
+    ss.inner.appendChild(el('p', 'slide-foot', 'made at zexley.com · stats computed by code, awards for fun · not affiliated with WhatsApp, Meta, Telegram, or Spotify'));
     slides.push(ss);
 
     state.slides = slides;
@@ -652,7 +733,7 @@
     x.font = '400 34px ' + sans; x.fillStyle = '#e8dcc6'; x.textAlign = 'center';
     x.fillText('made at zexley.com · stats computed by code, awards for fun', 540, 1820);
     x.font = '400 26px ' + sans; x.fillStyle = '#b8ab92';
-    x.fillText('Not affiliated with WhatsApp, Meta, or Spotify', 540, 1872);
+    x.fillText('Not affiliated with WhatsApp, Meta, Telegram, or Spotify', 540, 1872);
     return c;
   }
   function downloadShare() {

@@ -213,6 +213,7 @@
   catch (err) { EMOJI_RE = /[\u2600-\u27bf]|\ud83c[\udf00-\udfff]|\ud83d[\udc00-\ude4f\ude80-\udeff]|\ud83e[\udd00-\uddff]/g; }
   var LAUGH_RE = /\b(?:a?(?:ha){2,}h?|(?:he){2,}|lo+l+|lmf?ao+|rofl)\b|😂|🤣|😆|😹/gi;
   var OK_RE = /^(k+|kk+|ok+|okay|okie|okey|oki)[.!]?$/i;
+  var LINK_RE = /(?:\bhttps?:\/\/|\bwww\.)\S+/i; // counted only; links are never shown or stored
   var HEART_RE = /❤|🥰|😍|😘|💕|💖|💗|💛|💙|💚|💜|🤗|\blove\b|\blove you\b/gi;
   var DAYNAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -224,6 +225,8 @@
   function topN(map, n) { return Object.keys(map).map(function (k) { return { key: k, count: map[k] }; }).sort(function (a, b) { return b.count - a.count || (a.key < b.key ? -1 : 1); }).slice(0, n); }
   function fmtDate(t) { var d = new Date(t); return MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate() + ', ' + d.getUTCFullYear(); }
   function fmtHour(h) { var ap = h < 12 ? 'AM' : 'PM'; return (h % 12 || 12) + ' ' + ap; }
+  // v3: "1 person", "1 active day", "1 day" (live said "1 people" / "1 days" for tiny chats).
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
   function fmtGap(ms) { var s = Math.round(ms / 1000); if (s < 60) return s + ' sec'; var m = s / 60; if (m < 60) return (Math.round(m * 10) / 10) + ' min'; return (Math.round(m / 6) / 10) + ' hr'; }
 
   function computeStats(parsed, opts) {
@@ -240,7 +243,8 @@
     var nameWords = {};
     msgs.forEach(function (m) { m.sender.toLowerCase().split(/[^\p{L}\p{N}']+/u).forEach(function (w) { if (w) nameWords[w] = 1; }); });
     function P(name) {
-      return people[name] || (people[name] = { name: name, count: 0, words: 0, chars: 0, emojis: {}, emojiCount: 0, media: 0, sticker: 0, deleted: 0, laughs: 0, ok: 0, night: 0, early: 0, starts: 0, gaps: [], longest: null, questions: 0, exclaims: 0, hearts: 0 });
+      return people[name] || (people[name] = { name: name, count: 0, words: 0, chars: 0, emojis: {}, emojiCount: 0, media: 0, sticker: 0, deleted: 0, laughs: 0, ok: 0, night: 0, early: 0, starts: 0, gaps: [], longest: null, questions: 0, exclaims: 0, hearts: 0,
+        links: 0, weekend: 0, lunch: 0, closes: 0, days: {} }); // v3: links, weekend, lunch, closes, days
     }
     var prev = null;
     var SIX_H = 6 * 3600000, TWELVE_H = 12 * 3600000;
@@ -253,7 +257,11 @@
       wdCount[new Date(m.t).getUTCDay()]++;
       if (m.h >= 0 && m.h < 4) p.night++;
       if (m.h >= 5 && m.h < 8) p.early++;
+      if (m.h >= 12 && m.h < 14) p.lunch++;
+      var wd = new Date(m.t).getUTCDay(); if (wd === 0 || wd === 6) p.weekend++;
+      p.days[dk] = 1;
       if (!prev || m.t - prev.t >= SIX_H) p.starts++;
+      if (prev && m.t - prev.t >= SIX_H) P(prev.sender).closes++; // prev sent the last message before 6+ quiet hours
       if (prev && prev.sender !== m.sender && m.t - prev.t <= TWELVE_H) p.gaps.push(m.t - prev.t);
       prev = m;
       if (m.type === 'media') { p.media++; return; }
@@ -265,11 +273,12 @@
       if (OK_RE.test(tx.trim())) p.ok++;
       if (tx.indexOf('?') >= 0) p.questions++;
       if (/!/.test(tx)) p.exclaims++;
+      if (LINK_RE.test(tx)) p.links++;
       var lm = tx.match(LAUGH_RE); if (lm) p.laughs += lm.length;
       var hm = tx.match(HEART_RE); if (hm) p.hearts += hm.length;
       var em = tx.match(EMOJI_RE);
       if (em) em.forEach(function (e) { e = emojiKey(e); p.emojis[e] = (p.emojis[e] || 0) + 1; emojis[e] = (emojis[e] || 0) + 1; p.emojiCount++; });
-      var toks = tx.replace(/https?:\/\/\S+/g, ' ').toLowerCase().match(/[\p{L}\p{N}']+/gu) || [];
+      var toks = tx.replace(/(?:\bhttps?:\/\/|\bwww\.)\S+/gi, ' ').toLowerCase().match(/[\p{L}\p{N}']+/gu) || [];
       p.words += toks.length;
       toks.forEach(function (w) {
         w = w.replace(/^'+|'+$/g, '').replace(/'/g, '');
@@ -277,7 +286,7 @@
         words[w] = (words[w] || 0) + 1;
       });
     });
-    var list = Object.keys(people).map(function (k) { var p = people[k]; p.share = p.count / msgs.length; p.medianGap = p.gaps.length >= 5 ? median(p.gaps) : Infinity; p.topEmoji = topOf(p.emojis); p.avgLen = (p.count - p.media - p.sticker - p.deleted) > 0 ? p.chars / (p.count - p.media - p.sticker - p.deleted) : 0; return p; })
+    var list = Object.keys(people).map(function (k) { var p = people[k]; p.share = p.count / msgs.length; p.medianGap = p.gaps.length >= 5 ? median(p.gaps) : Infinity; p.topEmoji = topOf(p.emojis); p.typed = p.count - p.media - p.sticker - p.deleted; p.avgLen = p.typed > 0 ? p.chars / p.typed : 0; p.dayCount = Object.keys(p.days).length; delete p.days; return p; })
       .sort(function (a, b) { return b.count - a.count; });
     S.people = list;
     S.topTalker = list[0];
@@ -304,22 +313,31 @@
 
   // ---------- Awards (kind, never about appearance or identity) ----------
   var AWARDS = [
+    // v3 (Nov 21, 2026): six new awards marked "// v3", interleaved so they survive the MAX_AWARDS cap.
+    // New awards use counts only: no message text, links or exact times are shown or stored.
     { id: 'keeper', emoji: '🔥', title: 'Keeper of the Flame', metric: function (p) { return p.count; }, min: 1, line: function (p) { return p.count.toLocaleString('en-US') + ' messages kept this chat warm all year.'; } },
     { id: 'owl', emoji: '🦉', title: 'Night Owl', metric: function (p) { return p.night; }, min: 3, line: function (p) { return p.night + ' messages between midnight and 4 AM. Sweet dreams eventually.'; } },
     { id: 'bird', emoji: '🐦', title: 'Early Bird', metric: function (p) { return p.early; }, min: 3, line: function (p) { return p.early + ' messages between 5 and 8 AM. The chat\'s sunrise.'; } },
+    { id: 'weekend', emoji: '🎉', title: 'Weekend Warrior', metric: function (p) { return p.weekend; }, min: 5, line: function (p) { return p.weekend + ' messages on Saturdays and Sundays. Weekends are for the chat.'; } }, // v3
     { id: 'speedy', emoji: '⚡', title: 'Speedy Replier', metric: function (p) { return isFinite(p.medianGap) ? -p.medianGap : -Infinity; }, min: -Infinity, low: true, line: function (p) { return 'Typical reply in ' + fmtGap(p.medianGap) + '. Always there.'; } },
     { id: 'starter', emoji: '🎬', title: 'Conversation Starter', metric: function (p) { return p.starts; }, min: 2, line: function (p) { return 'Broke the silence ' + p.starts + ' times after 6+ quiet hours.'; } },
+    { id: 'closer', emoji: '🌙', title: 'Lights Out Award', metric: function (p) { return p.closes; }, min: 2, line: function (p) { return 'Sent the last message before a quiet spell ' + p.closes + ' times. Goodnight, chat.'; } }, // v3
     { id: 'ok', emoji: '👌', title: 'Master of Few Words', metric: function (p) { return p.ok; }, min: 3, line: function (p) { return p.ok + ' perfectly efficient "k"s and "ok"s.'; } },
     { id: 'media', emoji: '📸', title: 'Family Photographer', metric: function (p) { return p.media; }, min: 3, line: function (p) { return p.media + ' photos, videos and files shared.'; } },
+    { id: 'links', emoji: '🔗', title: 'Link Librarian', metric: function (p) { return p.links; }, min: 2, line: function (p) { return p.links + ' links shared. The group\'s personal librarian.'; } }, // v3
     { id: 'sticker', emoji: '🎨', title: 'Sticker Sorcerer', metric: function (p) { return p.sticker; }, min: 2, line: function (p) { return p.sticker + ' stickers deployed with precision.'; } },
     { id: 'novel', emoji: '📜', title: 'Novelist in Residence', metric: function (p) { return p.longest ? p.longest.text.length : 0; }, min: 80, line: function (p) { return 'Longest message of the year: ' + p.longest.text.length + ' characters.'; } },
+    { id: 'essay', emoji: '✍️', title: 'Essay Writer', metric: function (p) { return p.typed >= 5 ? Math.round(p.avgLen) : 0; }, min: 30, line: function (p) { return 'Typed messages averaged ' + Math.round(p.avgLen) + ' characters. Every word counted.'; } }, // v3
     { id: 'laugh', emoji: '😂', title: 'Chief Laugh Officer', metric: function (p) { return p.laughs; }, min: 3, line: function (p) { return p.laughs + ' laughs (haha, lol, 😂) shared.'; } },
+    { id: 'lunch', emoji: '🥪', title: 'Lunch Break Legend', metric: function (p) { return p.lunch; }, min: 3, line: function (p) { return p.lunch + ' messages between noon and 2 PM. Chatting over lunch.'; } }, // v3
     { id: 'heart', emoji: '❤️', title: 'Warmest Heart', metric: function (p) { return p.hearts; }, min: 3, line: function (p) { return p.hearts + ' hearts and "love you"s sent.'; } },
     { id: 'emoji', emoji: '✨', title: 'Emoji Artist', metric: function (p) { return p.emojiCount; }, min: 5, line: function (p) { return p.emojiCount + ' emojis, favorite: ' + (p.topEmoji ? p.topEmoji.key : '') + '.'; } },
     { id: 'deleted', emoji: '🫣', title: 'Second Thoughts Award', metric: function (p) { return p.deleted; }, min: 2, line: function (p) { return p.deleted + ' messages lovingly un-sent. We\'ll never know.'; } },
     { id: 'question', emoji: '❓', title: 'Question Master', metric: function (p) { return p.questions; }, min: 3, line: function (p) { return p.questions + ' questions asked. Curiosity keeps a family close.'; } },
-    { id: 'hype', emoji: '📣', title: 'Hype Squad Captain', metric: function (p) { return p.exclaims; }, min: 3, line: function (p) { return p.exclaims + ' messages with an exclamation point!'; } }
+    { id: 'hype', emoji: '📣', title: 'Hype Squad Captain', metric: function (p) { return p.exclaims; }, min: 3, line: function (p) { return p.exclaims + ' messages with an exclamation point!'; } },
+    { id: 'regular', emoji: '📅', title: 'Always Around', metric: function (p) { return p.dayCount; }, min: 3, line: function (p) { return 'Showed up on ' + p.dayCount + ' different days.'; } } // v3
   ];
+  var MAX_AWARDS = 16; // v3: was 12 (3 slides of 4); now up to 4 award slides
 
   function assignAwards(people) {
     var wins = {}, out = [];
@@ -335,11 +353,22 @@
       wins[w.p.name] = (wins[w.p.name] || 0) + 1;
       out.push({ id: a.id, emoji: a.emoji, title: a.title, winner: w.p.name, line: a.line(w.p) });
     });
-    // Keep at most 12: drop later awards held by people who already won something else.
-    for (var i = out.length - 1; i >= 0 && out.length > 12; i--) {
+    // Keep at most MAX_AWARDS: drop later awards held by people who already won something else.
+    for (var i = out.length - 1; i >= 0 && out.length > MAX_AWARDS; i--) {
       if (wins[out[i].winner] > 1) { wins[out[i].winner]--; out.splice(i, 1); }
     }
-    return out.slice(0, 12);
+    return out.slice(0, MAX_AWARDS);
+  }
+
+  // v3 share image: the top n awards to feature. Skips "Keeper of the Flame" (the image already
+  // shows the top talker) and prefers different winners so more people see their name.
+  function featuredAwards(awards, n) {
+    n = n || 3;
+    var pool = (awards || []).filter(function (a) { return a.id !== 'keeper'; }), out = [], seen = {};
+    pool.forEach(function (a) { if (out.length < n && !seen[a.winner]) { out.push(a); seen[a.winner] = 1; } });
+    pool.forEach(function (a) { if (out.length < n && out.indexOf(a) < 0) out.push(a); });
+    if (out.length < n) (awards || []).forEach(function (a) { if (out.length < n && out.indexOf(a) < 0) out.push(a); });
+    return out;
   }
 
   // ---------- ZIP (reads _chat.txt with the browser's own DecompressionStream) ----------
@@ -434,7 +463,7 @@
   }
   function paymentUrl(ref) { return PAYMENT_LINK + (PAYMENT_LINK.indexOf('?') >= 0 ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(ref); }
 
-  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, inferDateOrder: inferDateOrder, AWARDS: AWARDS, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl };
+  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
   root.Wrapped = api;
 
@@ -501,7 +530,7 @@
     var s1 = slide('intro', BRAND_NAME);
     s1.inner.appendChild(el('h2', 'slide-title', name));
     big(s1.inner, nf(S.total), 'messages in ' + yr);
-    s1.inner.appendChild(el('p', 'slide-sub', S.people.length + ' people · ' + S.activeDays + ' active days'));
+    s1.inner.appendChild(el('p', 'slide-sub', plural(S.people.length, 'person', 'people') + ' · ' + plural(S.activeDays, 'active day')));
     if (!S.usedYear) s1.inner.appendChild(el('p', 'slide-note', 'No ' + S.year + ' messages found, so this covers everything: ' + fmtDate(S.first) + ' to ' + fmtDate(S.last) + '.'));
     else if (S.totalAll > S.total) s1.inner.appendChild(el('p', 'slide-note', 'Counting ' + S.year + ' only (' + nf(S.totalAll - S.total) + ' older messages left out).'));
     slides.push(s1);
@@ -527,7 +556,7 @@
     slides.push(s3);
 
     var s4 = slide('streak', 'Longest streak');
-    big(s4.inner, S.streak.len + ' days', 'in a row with at least one message');
+    big(s4.inner, plural(S.streak.len, 'day'), 'in a row with at least one message');
     s4.inner.appendChild(el('p', 'slide-sub', fmtDate(S.streak.start) + ' → ' + fmtDate(S.streak.end)));
     slides.push(s4);
 
@@ -567,7 +596,7 @@
     var ss = slide('summary', 'Your ' + yr + ' in one slide');
     ss.inner.appendChild(el('h2', 'slide-title', name));
     var grid = el('dl', 'sum');
-    [['Messages', nf(S.total)], ['Top talker', S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Streak', S.streak.len + ' days'], ['Emoji', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word', S.topWords[0] ? S.topWords[0].key : '—']].forEach(function (r) { grid.appendChild(el('dt', null, r[0])); grid.appendChild(el('dd', null, r[1])); });
+    [['Messages', nf(S.total)], ['Top talker', S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Streak', plural(S.streak.len, 'day')], ['Emoji', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word', S.topWords[0] ? S.topWords[0].key : '—']].forEach(function (r) { grid.appendChild(el('dt', null, r[0])); grid.appendChild(el('dd', null, r[1])); });
     ss.inner.appendChild(grid);
     var ul2 = el('ul', 'sum-awards');
     S.awards.slice(0, 6).forEach(function (a) { ul2.appendChild(el('li', null, a.emoji + ' ' + a.title + ': ' + a.winner)); });
@@ -718,22 +747,38 @@
     x.fillStyle = '#fffaf2'; x.font = '700 84px ' + serif; x.fillText(fitText(x, S.groupName || 'Our group chat', 960), 540, 290);
     x.font = '700 200px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(nf(S.total), 540, 530);
     x.font = '400 44px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText('messages' + (S.usedYear ? ' in ' + S.year : ' (all time)'), 540, 600);
-    var rows = [['Top talker', S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Longest streak', S.streak.len + ' days'], ['Emoji of the year', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word of the year', S.topWords[0] ? S.topWords[0].key : '—']];
-    var y = 720;
-    rows.forEach(function (r) { x.textAlign = 'left'; x.font = '400 40px ' + sans; x.fillStyle = '#d9a441'; x.fillText(r[0], 110, y); x.textAlign = 'right'; x.font = '700 46px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, r[1], 520), 970, y); y += 90; });
-    y += 20; x.strokeStyle = 'rgba(217,164,65,0.5)'; x.lineWidth = 2; x.beginPath(); x.moveTo(110, y); x.lineTo(970, y); x.stroke(); y += 80;
+    var rows = [['Top talker', S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Longest streak', plural(S.streak.len, 'day')], ['Emoji of the year', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word of the year', S.topWords[0] ? S.topWords[0].key : '—']];
+    var y = 710;
+    rows.forEach(function (r) { x.textAlign = 'left'; x.font = '400 40px ' + sans; x.fillStyle = '#d9a441'; x.fillText(r[0], 110, y); x.textAlign = 'right'; x.font = '700 46px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, r[1], 520), 970, y); y += 82; });
+    y += 4; x.strokeStyle = 'rgba(217,164,65,0.5)'; x.lineWidth = 2; x.beginPath(); x.moveTo(110, y); x.lineTo(970, y); x.stroke(); y += 72;
     x.textAlign = 'center';
-    if (state.unlocked) {
-      x.font = '700 50px ' + serif; x.fillStyle = '#d9a441'; x.fillText('The awards', 540, y); y += 80;
-      S.awards.slice(0, 6).forEach(function (a) { x.font = '400 40px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, a.emoji + ' ' + a.title + ': ' + a.winner, 900), 540, y); y += 72; });
-    } else {
-      x.font = '700 56px ' + serif; x.fillStyle = '#d9a441'; x.fillText(S.awards.length + ' group awards inside 🏆', 540, y + 40);
-      x.font = '400 40px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText('Who is the Night Owl? The Speedy Replier?', 540, y + 130);
+    // v3: top 3 awards as cards (winner names only after unlock; locked shows a teaser with "?").
+    var feat = featuredAwards(S.awards, 3);
+    function card(top, a, locked) {
+      var L = 110, W = 860, H = 150, R = 26;
+      x.beginPath(); x.moveTo(L + R, top); x.lineTo(L + W - R, top); x.quadraticCurveTo(L + W, top, L + W, top + R); x.lineTo(L + W, top + H - R); x.quadraticCurveTo(L + W, top + H, L + W - R, top + H);
+      x.lineTo(L + R, top + H); x.quadraticCurveTo(L, top + H, L, top + H - R); x.lineTo(L, top + R); x.quadraticCurveTo(L, top, L + R, top); x.closePath();
+      x.fillStyle = 'rgba(255,250,242,0.08)'; x.fill(); x.strokeStyle = 'rgba(217,164,65,0.45)'; x.lineWidth = 2; x.stroke();
+      x.textAlign = 'center'; x.font = '72px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(a.emoji, L + 80, top + 100);
+      x.textAlign = 'left'; x.font = '600 36px ' + sans; x.fillStyle = '#d9a441'; x.fillText(fitText(x, a.title, W - 200), L + 165, top + 52);
+      x.font = '700 48px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, locked ? '? ? ?' : a.winner, W - 200), L + 165, top + 106);
+      var sub = locked ? 'Who won? Unlock the full recap to find out.' : (/^(.+?[.!?])(\s|$)/.exec(a.line) || [a.line, a.line])[1]; // first sentence only
+      x.font = '400 28px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText(fitText(x, sub, W - 200), L + 165, top + 138);
+      x.textAlign = 'center';
     }
-    x.font = '400 34px ' + sans; x.fillStyle = '#e8dcc6'; x.textAlign = 'center';
-    x.fillText('made at zexley.com · stats computed by code, awards for fun', 540, 1820);
+    if (feat.length) {
+      x.font = '700 50px ' + serif; x.fillStyle = '#d9a441';
+      x.fillText(state.unlocked ? 'Top awards' + (S.awards.length > feat.length ? ' (' + feat.length + ' of ' + S.awards.length + ')' : '') : S.awards.length + ' group awards inside 🏆', 540, y);
+      y += 34;
+      feat.forEach(function (a) { card(y, a, !state.unlocked); y += 166; });
+    } else {
+      x.font = '700 56px ' + serif; x.fillStyle = '#d9a441'; x.fillText('A quiet, cozy year 🏆', 540, y + 40);
+    }
+    x.font = '400 32px ' + sans; x.fillStyle = '#e8dcc6'; x.textAlign = 'center';
+    x.fillText('made at zexley.com/wrapped · stats computed by code, awards for fun', 540, 1800);
     x.font = '400 26px ' + sans; x.fillStyle = '#b8ab92';
-    x.fillText('Not affiliated with WhatsApp, Meta, Telegram, or Spotify', 540, 1872);
+    x.fillText('AI-assisted product by Zexley · no AI reads your chat', 540, 1844);
+    x.fillText('Not affiliated with WhatsApp, Meta, Telegram, or Spotify', 540, 1882);
     return c;
   }
   function downloadShare() {

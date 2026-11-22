@@ -1,8 +1,10 @@
 /*
  * Group Chat Wrapped 2026 (BRAND_NAME below) — Zexley (assumed name of Bloom Commerce LLC)
- * Not affiliated with WhatsApp, Meta, Telegram, or Spotify.
- * Reads WhatsApp "Export chat" text files and Telegram Desktop "Machine-readable JSON" exports.
+ * Not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, or Spotify.
+ * Reads WhatsApp "Export chat" text files, Telegram Desktop "Machine-readable JSON" exports,
+ * and (v5 draft) Instagram / Facebook Messenger chats from Meta's "Download your information" JSON export.
  * v4 (published): share image includes a "Make yours" call-to-action and an on-device QR code.
+ * v5 (UNPUBLISHED draft): Instagram + Messenger JSON, non-English WhatsApp exports (de/es/pt/fr/it/nl).
  * Everything runs in the browser. This file makes NO network
  * requests: no fetch, no XHR, no beacons, no analytics, no external fonts.
  * The page's Content-Security-Policy (connect-src 'none') also blocks them.
@@ -39,14 +41,39 @@
   var ODD_SPACES = /[\u202f\u00a0\u2009\u2007]/g;
   var DATE = '(\\d{1,4})[\\/.\\-](\\d{1,2})[\\/.\\-](\\d{1,4})';
   var TIME = '(\\d{1,2})[:.](\\d{2})(?:[:.](\\d{2}))?\\s*([AaPp]\\.?\\s?[Mm]\\.?)?';
-  var HEADER_IOS = new RegExp('^\\[' + DATE + ',?\\s+' + TIME + '\\]\\s?(.*)$');
-  var HEADER_ANDROID = new RegExp('^' + DATE + ',?\\s+' + TIME + '\\s*[-\\u2013]\\s(.*)$');
+  // v5: ",?\s+(?:à\s+)?" also accepts French Android exports ("22/11/2026 à 14:05 - ...").
+  var SEP = ',?\\s+(?:\u00e0\\s+)?';
+  var HEADER_IOS = new RegExp('^\\[' + DATE + SEP + TIME + '\\]\\s?(.*)$');
+  var HEADER_ANDROID = new RegExp('^' + DATE + SEP + TIME + '\\s*[-\\u2013]\\s(.*)$');
 
   var MEDIA_RE = /^(<media omitted>|(image|video|audio|sticker|gif|document|contact card|photo|voice message) omitted|<attached: .+>|.+\.(jpe?g|png|webp|gif|opus|mp4|mp3|m4a|pdf|vcf) \(file attached\)(\n[\s\S]*)?|null)$/i;
-  var STICKER_RE = /sticker omitted|STICKER-|\.webp \(file attached\)|<attached: .*\.webp>/i;
+  // v5: non-English media placeholders. Each must be the WHOLE message, so a wrong guess can only
+  // fail to match; it can never swallow a real message. See CHANGES.md for which ones are verified.
+  // Android "<...>" forms: de, es, pt (BR + older wording), fr, it, nl.
+  var MEDIA_L10N_RE = /^(<medien ausgeschlossen>|<multimedia omitido>|<m\u00eddia oculta>|<arquivo de m\u00eddia oculto>|<m\u00e9dias omis>|<media omessi>|<media weggelaten>|(bild|video|audio|sticker|gif|dokument) weggelassen|(imagen|sticker|gif|documento) omitid[ao]|(video|v\u00eddeo|audio) omitido)$/i;
+  // Any language: "<Anhang: 00000012-PHOTO-2026-11-22.jpg>" (iOS with media) and
+  // "IMG-20261122-WA0001.jpg (Datei angeh\u00e4ngt)" (Android with media).
+  var MEDIA_FILE_RE = /^(<[^<>:\n]{2,24}: [^<>\n]+\.(jpe?g|png|webp|gif|opus|mp4|mp3|m4a|pdf|vcf|3gp|aac|heic|mov)>|\S+\.(jpe?g|png|webp|gif|opus|mp4|mp3|m4a|pdf|vcf|3gp|aac|heic|mov) \([^()\n]{3,40}\)(\n[\s\S]*)?)$/i;
+  var STICKER_RE = /sticker omitted|sticker weggelassen|sticker omitido|STICKER-|\.webp \(|<[^<>]+\.webp>/i;
   var DELETED_RE = /^(this message was deleted|you deleted this message|this message was deleted by an admin)\.?$/i;
+  // v5: deleted-message notices in de, es, pt, fr, it, nl (whole message only).
+  var DELETED_L10N_RE = /^(diese nachricht wurde gel\u00f6scht|du hast diese nachricht gel\u00f6scht|se elimin\u00f3 este mensaje|eliminaste este mensaje|mensagem apagada|esta mensagem foi apagada|voc\u00ea apagou esta mensagem|ce message a \u00e9t\u00e9 supprim\u00e9|vous avez supprim\u00e9 ce message|questo messaggio \u00e8 stato eliminato|hai eliminato questo messaggio|dit bericht is verwijderd|je hebt dit bericht verwijderd)\.?$/i;
+  // v5: the "messages and calls are end-to-end encrypted" notice. Localized notices always also say "WhatsApp".
+  var ENCRYPT_RE = /end-to-end encrypted/i;
+  var ENCRYPT_L10N_RE = /end-to-end|ende-zu-ende|de extremo a extremo|de ponta a ponta|de bout en bout/i;
+  var GROUP_WORD_RE = /grupp|grupo|groupe|groep|betreff|asunto|assunto|sujet|oggetto|onderwerp/i;
+  var QUOTED_RE = /[\u201e\u201c"\u00ab\u2039]\s*([^\u201e\u201c\u201d"\u00ab\u00bb\u2039\u203a\n]{1,80}?)\s*[\u201c\u201d"\u00bb\u203a]/g;
+  function isEncryptNotice(t) { return ENCRYPT_RE.test(t) || (ENCRYPT_L10N_RE.test(t) && /whatsapp/i.test(t)); }
   var SYSTEM_RE = /end-to-end encrypted|^(.+ )?(created (this )?group|created group|added |removed |left$|joined using this group's invite link|joined from the community|changed the subject|changed this group's icon|changed the group description|changed their phone number|changed the group settings|deleted this group's icon|is now an admin|changed to .+|turned (on|off) disappearing messages|pinned a message|missed (voice|video) call)/i;
-  var EDITED_RE = /\s*<this message was edited>\s*$/i;
+  var EDITED_RE = /\s*<(this message was edited|diese nachricht wurde bearbeitet|se edit\u00f3 este mensaje\.?|mensagem editada|ce message a \u00e9t\u00e9 modifi\u00e9|questo messaggio \u00e8 stato modificato|dit bericht is bewerkt)>\s*$/i;
+  // v5: an Android notice like  Anna hat den Betreff von \u201eTrip: 2025\u201c ...  has an opening quote that is
+  // not closed before the colon. Real display names practically never do, in any language.
+  function hasOpenQuote(s) {
+    var n = function (re) { return (s.match(re) || []).length; };
+    if (n(/"/g) % 2 === 1) return true;
+    if (n(/\u201e/g)) return n(/\u201e/g) > n(/\u201c/g);                       // German \u201e...\u201c
+    return n(/[\u201c\u00ab\u2039]/g) > n(/[\u201d\u00bb\u203a]/g);             // \u201c...\u201d, \u00ab...\u00bb, \u2039...\u203a
+  }
 
   function clean(s) { return s.replace(INVISIBLE, '').replace(ODD_SPACES, ' '); }
 
@@ -117,7 +144,7 @@
       // notice (e.g. Ann changed the subject from "Trip: 2025" to "Fam")
       // was being read as a fake member. Undo that when the extracted
       // "sender" itself looks like a system line.
-      if (sender && SYSTEM_RE.test(body) && SYSTEM_RE.test(sender)) {
+      if (sender && ((SYSTEM_RE.test(body) && SYSTEM_RE.test(sender)) || hasOpenQuote(sender))) {
         sender = null;
         txt = body;
       }
@@ -125,14 +152,21 @@
       var trimmed = txt.trim();
       var type = 'text';
       if (!sender) type = 'system';
-      else if (DELETED_RE.test(trimmed)) type = 'deleted';
-      else if (MEDIA_RE.test(trimmed)) type = STICKER_RE.test(trimmed) ? 'sticker' : 'media';
+      else if (isEncryptNotice(trimmed)) type = 'system';
+      else if (DELETED_RE.test(trimmed) || DELETED_L10N_RE.test(trimmed)) type = 'deleted';
+      else if (MEDIA_RE.test(trimmed) || MEDIA_L10N_RE.test(trimmed) || MEDIA_FILE_RE.test(trimmed)) type = STICKER_RE.test(trimmed) ? 'sticker' : 'media';
       // iOS marks system notices (in any language) with a leading LRM; real typed messages don't have one.
-      else if (/end-to-end encrypted/i.test(trimmed) || e.lrm || (!sender && SYSTEM_RE.test(trimmed))) type = 'system';
+      else if (e.lrm || (!sender && SYSTEM_RE.test(trimmed))) type = 'system';
       if (type === 'system') {
-        var gm = /(?:created group|changed the subject (?:from .+ )?to) [“"](.+)[”"]/.exec(trimmed);
+        var gm = /(?:created group|changed the (?:subject|group name) (?:from .+ )?to) [“"](.+)[”"]/.exec(trimmed);
         if (gm) groupName = gm[1];
-        if (sender && /end-to-end encrypted/i.test(trimmed)) groupName = groupName || sender;
+        else if (GROUP_WORD_RE.test(trimmed)) {
+          // v5, other languages: take the last quoted name in a "created group" / "changed subject" notice.
+          var qm, last = null; QUOTED_RE.lastIndex = 0;
+          while ((qm = QUOTED_RE.exec(trimmed))) last = qm[1];
+          if (last) groupName = last;
+        }
+        if (sender && isEncryptNotice(trimmed)) groupName = groupName || sender;
       }
       msgs.push({ t: t, y: y, mo: mo, d: d, h: h, mi: e.mi, sender: type === 'system' ? null : sender, text: trimmed, type: type });
     }
@@ -160,10 +194,10 @@
       try { data = JSON.parse(data.replace(/^\ufeff/, '')); }
       catch (err) { throw friendly('That file looks like JSON, but it could not be read. It may be cut off or damaged. Export the chat from Telegram Desktop again (format: "Machine-readable JSON") and drop the result.json.'); }
     }
-    if (!data || typeof data !== 'object') throw friendly('That JSON file is not a Telegram chat export.');
+    if (!data || typeof data !== 'object') throw friendly('That JSON file is not a Telegram chat export, an Instagram chat, or a Messenger chat.');
     if (!Array.isArray(data.messages)) {
       if (data.chats || data.personal_information) throw friendly('That looks like a full Telegram account export. Export just one chat instead: open the chat in Telegram Desktop, choose "Export chat history", and pick "Machine-readable JSON".');
-      throw friendly('That JSON file is not a Telegram chat export (no "messages" list). In Telegram Desktop, open the chat, choose "Export chat history", and pick "Machine-readable JSON".');
+      throw friendly('That JSON file is not a Telegram chat export (no "messages" list). In Telegram Desktop, open the chat, choose "Export chat history", and pick "Machine-readable JSON". For Instagram or Messenger, drop the .zip from "Download your information" (JSON format) or a message_1.json.');
     }
     var msgs = [];
     data.messages.forEach(function (m) {
@@ -189,30 +223,146 @@
     return { messages: msgs, dateOrder: 'ymd', groupName: name, format: 'telegram' };
   }
 
-  // Picks the parser by content, not by file name: JSON with a messages list = Telegram, else WhatsApp text.
+  // ---------- Instagram / Facebook Messenger (Meta "Download your information", format JSON) ----------
+  // messages/inbox/<thread>/message_1.json (+ message_2.json ... for long chats):
+  //   { participants: [{ name }], messages: [{ sender_name, timestamp_ms, content?, photos?, videos?, gifs?,
+  //     audio_files?, files?, sticker?, share?, reactions?, is_unsent?, call_duration?, type? }], title, thread_path }
+  // Messages are listed newest first. Meta writes text as UTF-8 bytes escaped one by one ("\u00f0\u009f\u0098\u0082"
+  // instead of "😂"), so every string is turned back into real UTF-8 before use.
+  // Also accepted (best effort, see CHANGES.md): the camelCase shape { participants: ["Name"], threadName,
+  //   messages: [{ senderName, timestamp, text, media, isUnsent, type }] }.
+  var META_MEDIA_KEYS = ['photos', 'videos', 'gifs', 'audio_files', 'files'];
+  // English-only notices Meta writes as ordinary messages. Only used when the message has no media.
+  var META_SYSTEM_RE = /^(.{1,80}? )?(named the group|changed the group (photo|name)|set (the|your|his|her|their) (own )?nickname|set the nickname|cleared the nickname|set the emoji to|changed the (chat )?theme|added .{1,80} to the group|removed .{1,80} from the group|left the group|started (a|an) (video|audio|voice) (call|chat)|joined the (video|audio|voice) (call|chat)|the (video|audio) (call|chat) ended|you are now connected on messenger|you can now (message|call) each other)|^(reacted .{1,16} to your message|liked a message)\s*$/i;
+  var META_ATTACH_RE = /^(.{1,80} )?sent an attachment\.?$|^(.{1,80} )?sent a (photo|video|voice message|gif|sticker)\.?$/i;
+  function fixMojibake(s) {
+    if (typeof s !== 'string' || !/[\u0080-\u00ff]/.test(s) || /[^\u0000-\u00ff]/.test(s)) return s;
+    var b = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(b); } catch (e) { return s; } // real latin-1 text: keep
+  }
+  function fixDeep(v) {
+    if (typeof v === 'string') return fixMojibake(v);
+    if (Array.isArray(v)) return v.map(fixDeep);
+    if (v && typeof v === 'object') { var o = {}; for (var k in v) if (Object.prototype.hasOwnProperty.call(v, k)) o[k] = fixDeep(v[k]); return o; }
+    return v;
+  }
+  function isMetaJson(d) {
+    if (!d || typeof d !== 'object' || Array.isArray(d) || !Array.isArray(d.messages)) return false;
+    var probe = d.messages.slice(0, 20).concat(d.messages.slice(-5));
+    if (probe.some(function (m) { return m && typeof m === 'object' && ('sender_name' in m || 'timestamp_ms' in m || ('senderName' in m && 'timestamp' in m)); })) return true;
+    // an empty thread still has participants: [{ name }] and no Telegram-style "type"/"id"
+    return Array.isArray(d.participants) && !('id' in d) && !('type' in d);
+  }
+  function metaParts(input) {
+    var parts = Array.isArray(input) ? input : [input];
+    return parts.map(function (p) {
+      if (typeof p === 'string') {
+        try { p = JSON.parse(p.replace(/^\ufeff/, '')); }
+        catch (e) { throw friendly('That file looks like JSON, but it could not be read. It may be cut off or damaged. Download your Instagram or Messenger information again in JSON format and drop the .zip (or a message_1.json).'); }
+      }
+      if (!isMetaJson(p)) throw friendly('That JSON file is not an Instagram or Messenger chat. Drop the .zip from "Download your information" (JSON format), or a message_1.json from inside messages/inbox/<chat name>/.');
+      return fixDeep(p);
+    });
+  }
+  // opts.utcOffsetMin (tests only): fixed offset instead of this device's time zone.
+  function localParts(ms, opts) {
+    var d;
+    if (opts && typeof opts.utcOffsetMin === 'number') { d = new Date(ms + opts.utcOffsetMin * 60000); return { y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes(), s: d.getUTCSeconds() }; }
+    d = new Date(ms); return { y: d.getFullYear(), mo: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: d.getMinutes(), s: d.getSeconds() };
+  }
+  function nonEmpty(a) { return Array.isArray(a) ? a.length > 0 : !!a; }
+  function parseMeta(input, opts) {
+    var parts = metaParts(input), seen = {}, msgs = [], title = null;
+    parts.forEach(function (data) {
+      if (!title) { var tt = typeof data.title === 'string' ? data.title : (typeof data.threadName === 'string' ? data.threadName : ''); if (clean(tt).trim()) title = clean(tt).trim(); }
+      data.messages.forEach(function (m) {
+        if (!m || typeof m !== 'object') return;
+        var ms = +(m.timestamp_ms != null ? m.timestamp_ms : m.timestamp);
+        if (!isFinite(ms) || ms <= 0) return;
+        if (ms < 1e11) ms *= 1000; // camelCase exports may use seconds
+        var sender = m.sender_name != null ? m.sender_name : m.senderName;
+        sender = sender != null ? clean(String(sender)).trim() : '';
+        if (!sender) return;
+        var text = m.content != null ? m.content : m.text;
+        text = typeof text === 'string' ? clean(text).replace(/\s+$/, '').trim() : '';
+        var media = META_MEDIA_KEYS.some(function (k) { return nonEmpty(m[k]); }) || nonEmpty(m.media);
+        var key = sender + '\u0001' + ms + '\u0001' + text + '\u0001' + META_MEDIA_KEYS.map(function (k) { return Array.isArray(m[k]) ? m[k].length : 0; }).join(',') + (m.sticker ? 's' : '');
+        if (seen[key]) return; // the same message in two parts / two uploads
+        seen[key] = 1;
+        var type = 'text';
+        if (m.is_unsent === true || m.isUnsent === true) type = 'deleted';
+        else if (/^(.{1,80} )?unsent a message\.?$/i.test(text)) type = 'deleted';
+        else if (m.call_duration != null || /^(call|subscribe|unsubscribe)$/i.test(String(m.type || ''))) type = 'system';
+        else if (m.sticker) type = 'sticker';
+        else if (media) type = 'media';
+        else if (!text) { if (m.share) type = 'media'; else return; }
+        else if (META_SYSTEM_RE.test(text)) type = 'system';
+        else if (META_ATTACH_RE.test(text)) type = 'media';
+        var p = localParts(ms, opts);
+        msgs.push({ t: Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s), y: p.y, mo: p.mo, d: p.d, h: p.h, mi: p.mi, sender: type === 'system' ? null : sender, text: type === 'text' ? text : (type === 'system' ? text : ''), type: type });
+      });
+    });
+    msgs.sort(function (a, b) { return a.t - b.t; });
+    return { messages: msgs, dateOrder: 'ymd', groupName: title, format: 'meta' };
+  }
+  // Groups message_N.json files from a Meta zip by chat folder. Returns [{ folder, title, count, parts }],
+  // biggest chat first. Each part is the parsed (not yet mojibake-fixed) JSON object.
+  function metaThreads(files) {
+    var by = {};
+    files.forEach(function (f) {
+      var folder = f.name.replace(/\/?[^\/]*$/, '');
+      (by[folder] = by[folder] || []).push(f);
+    });
+    return Object.keys(by).map(function (folder) {
+      var parts = by[folder].sort(function (a, b) { return (+(/(\d+)\.json$/i.exec(a.name) || [0, 0])[1]) - (+(/(\d+)\.json$/i.exec(b.name) || [0, 0])[1]); }).map(function (f) { return f.data; });
+      var t = parts.map(function (p) { return p.title || p.threadName; }).filter(function (x) { return typeof x === 'string' && x.trim(); })[0];
+      return { folder: folder, title: t ? clean(fixMojibake(t)).trim() : folder.split('/').pop(), count: parts.reduce(function (n, p) { return n + p.messages.length; }, 0), parts: parts };
+    }).sort(function (a, b) { return b.count - a.count || (a.title < b.title ? -1 : 1); });
+  }
+
+  // Picks the parser by content, not by file name: Meta-shaped JSON (sender_name / timestamp_ms) = Instagram or
+  // Messenger, any other JSON = Telegram (its parser explains what is wrong), else WhatsApp text.
+  function sniffJson(text) {
+    var body = String(text || '').replace(/^[\ufeff\s]+/, ''), c = body.charAt(0);
+    if (c !== '{' && c !== '[') return null;
+    var data; try { data = JSON.parse(body); } catch (e) { return c === '{' ? { format: 'telegram', data: null } : null; }
+    return { format: isMetaJson(data) ? 'meta' : 'telegram', data: data };
+  }
   function detectFormat(text) {
     var body = String(text || '').replace(/^[\ufeff\s]+/, ''), head = body.slice(0, 200);
-    if (head.charAt(0) === '{') return 'telegram';
     // "[" can start a JSON array or an iOS WhatsApp line like "[12/24/25, 9:14 PM] ..."; only real JSON counts.
-    if (head.charAt(0) === '[') { try { JSON.parse(body); return 'telegram'; } catch (e) { return 'whatsapp'; } }
+    var j = sniffJson(body);
+    if (j) return j.format;
+    if (head.charAt(0) === '[') return 'whatsapp';
     if (/^<(!doctype html|html)/i.test(head)) return 'html';
     return 'whatsapp';
   }
-  function parseAny(text) {
-    var f = detectFormat(text);
-    if (f === 'telegram') return parseTelegram(String(text));
-    if (f === 'html') throw friendly('That looks like a web page, such as Telegram\'s HTML export. Export the chat again in Telegram Desktop and choose the format "Machine-readable JSON", then drop the result.json.');
+  function parseAny(text, opts) {
+    var j = sniffJson(text);
+    if (j && j.format === 'meta') return parseMeta(j.data, opts);
+    if (j) return parseTelegram(j.data === null ? String(text) : j.data);
+    if (detectFormat(text) === 'html') throw friendly('That looks like a web page, such as Telegram\'s HTML export. Export the chat again in Telegram Desktop and choose the format "Machine-readable JSON", then drop the result.json. (For Instagram or Messenger, request your information in JSON format, not HTML.)');
     return parseChat(text);
   }
 
   // ---------- Stats ----------
   var STOP = ('a about above after again against all also am an and any are as at be because been before being below between both but by can cant could did do does doing dont down during each few for from further get got had has have having he her here hers herself him himself his how i if im in into is isnt it its itself ive just let lets like me more most my myself no nor not now of off on once only or other our ours ourselves out over own same she should so some such than that thats the their theirs them themselves then there these they this those through to too under until up very was wasnt we were what when where which while who whom why will with would you your yours yourself yourselves youre ill well yes yeah yep nope one two will thats theres gonna wanna also really still oh okay ok kk see know think going want need make go come back time today tomorrow tonight day good much many even thing things way said say tell sure maybe right new www http https com didnt doesnt wont cant thanks thank lol haha hahaha lmao omw hey hello hi');
+  // v5: the most common short words in German, Spanish, Portuguese, French, Italian and Dutch, so
+  // "Top words" for non-English chats are not just "und" / "que" / "les". Words that are also
+  // common English words (hat, war, bin, son, pain...) are deliberately left out.
+  var STOP_L10N = ('und der das ist ich nicht mit sie ein eine einen auf f\u00fcr den dem des auch sich wir ihr mir dich mich dir noch wie wenn dann schon nur mal haben bist sind wird kann doch hab ja nein aber oder' +
+    ' que los las del por una con para como pero m\u00e1s mas muy esto esta este eso ese hay tengo tiene estoy est\u00e1 s\u00ed qu\u00e9 c\u00f3mo bueno pues porque cuando donde tambi\u00e9n nos les yo t\u00fa vos' +
+    ' n\u00e3o nao uma mais muito isso essa esse tem dos das pra voc\u00ea vc ele ela tamb\u00e9m quando onde est\u00e1 tava' +
+    ' les des est pas une qui dans pour avec sur mais tout tous vous nous elle ils sont cest moi toi oui non bien tr\u00e8s aussi \u00e7a' +
+    ' che non per sono anche pi\u00f9 piu tutto questo questa della delle degli sei hai cosa ci\u00f2' +
+    ' het een van dat niet ook maar met voor zijn jij wij als nog wel heb hebt naar').split(' ');
   var STOPSET = {};
-  STOP.split(' ').forEach(function (w) { STOPSET[w] = 1; });
+  STOP.split(' ').concat(STOP_L10N).forEach(function (w) { STOPSET[w] = 1; });
   var EMOJI_RE;
   try { EMOJI_RE = new RegExp('(?:\\p{Extended_Pictographic}|\\p{Regional_Indicator}{2})(?:\\uFE0F|\\p{Emoji_Modifier}|\\u200D(?:\\p{Extended_Pictographic})\\uFE0F?)*', 'gu'); }
   catch (err) { EMOJI_RE = /[\u2600-\u27bf]|\ud83c[\udf00-\udfff]|\ud83d[\udc00-\ude4f\ude80-\udeff]|\ud83e[\udd00-\uddff]/g; }
-  var LAUGH_RE = /\b(?:a?(?:ha){2,}h?|(?:he){2,}|lo+l+|lmf?ao+|rofl)\b|😂|🤣|😆|😹/gi;
+  var LAUGH_RE = /\b(?:a?(?:ha){2,}h?|(?:he){2,}|lo+l+|lmf?ao+|rofl|(?:ja){2,}j?|mdr)\b|😂|🤣|😆|😹/gi; // v5: + "jajaja" (es), "mdr" (fr)
   var OK_RE = /^(k+|kk+|ok+|okay|okie|okey|oki)[.!]?$/i;
   var LINK_RE = /(?:\bhttps?:\/\/|\bwww\.)\S+/i; // counted only; links are never shown or stored
   var HEART_RE = /❤|🥰|😍|😘|💕|💖|💗|💛|💙|💚|💜|🤗|\blove\b|\blove you\b/gi;
@@ -283,7 +433,7 @@
       p.words += toks.length;
       toks.forEach(function (w) {
         w = w.replace(/^'+|'+$/g, '').replace(/'/g, '');
-        if (w.length < 3 || /^\d+$/.test(w) || STOPSET[w] || nameWords[w] || /^(a?(ha)+h?|(he)+|lo+l+|lmf?ao+|k+|ok+)$/.test(w)) return;
+        if (w.length < 3 || /^\d+$/.test(w) || STOPSET[w] || nameWords[w] || /^(a?(ha)+h?|(he)+|lo+l+|lmf?ao+|k+|ok+|(ja)+j?|mdr)$/.test(w)) return;
         words[w] = (words[w] || 0) + 1;
       });
     });
@@ -375,10 +525,12 @@
   // ---------- ZIP (reads _chat.txt with the browser's own DecompressionStream) ----------
   function u16(b, o) { return b[o] | (b[o + 1] << 8); }
   function u32(b, o) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
-  function readZipChat(buf) {
+  // v5: the zip reading is split into zipIndex (central directory) + zipText (one entry) so a Meta export
+  // with message_1.json, message_2.json ... (possibly for many chats) can be read with the same code.
+  function zipIndex(buf) {
     var b = new Uint8Array(buf), i, eocd = -1;
     for (i = b.length - 22; i >= Math.max(0, b.length - 65557); i--) if (u32(b, i) === 0x06054b50) { eocd = i; break; }
-    if (eocd < 0) return Promise.reject(new Error('This does not look like a zip file.'));
+    if (eocd < 0) throw new Error('This does not look like a zip file.');
     var n = u16(b, eocd + 10), off = u32(b, eocd + 16), entries = [];
     for (i = 0; i < n && u32(b, off) === 0x02014b50; i++) {
       var nameLen = u16(b, off + 28), extraLen = u16(b, off + 30), comLen = u16(b, off + 32);
@@ -387,20 +539,52 @@
       off += 46 + nameLen + extraLen + comLen;
     }
     var real = entries.filter(function (x) { return !/(^|\/)__MACOSX\//.test(x.name) && !/(^|\/)\._/.test(x.name); });
-    var e = real.filter(function (x) { return /(^|\/)_chat\.txt$/i.test(x.name); })[0]
-      || real.filter(function (x) { return /(^|\/)result\.json$/i.test(x.name); }).sort(function (a, b) { return a.name.length - b.name.length; })[0]
-      || real.filter(function (x) { return /\.txt$/i.test(x.name); })[0];
-    if (!e) return Promise.reject(new Error('No WhatsApp _chat.txt or Telegram result.json found inside the zip.'));
+    return { b: b, entries: real };
+  }
+  function zipText(b, e) {
     var lo = e.local;
     if (u32(b, lo) !== 0x04034b50) return Promise.reject(new Error('Zip entry is damaged.'));
     var start = lo + 30 + u16(b, lo + 26) + u16(b, lo + 28);
     var data = b.subarray(start, start + e.csize);
     if (e.method === 0) return Promise.resolve(new TextDecoder().decode(data));
     if (e.method !== 8) return Promise.reject(new Error('Unsupported zip compression.'));
-    if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('Your browser cannot unzip here. Unzip the file and drop the _chat.txt (WhatsApp) or result.json (Telegram) instead.'));
+    if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('Your browser cannot unzip here. Unzip the file and drop the _chat.txt (WhatsApp), result.json (Telegram) or message_1.json (Instagram / Messenger) instead.'));
     var ds = new DecompressionStream('deflate-raw');
     var stream = new Blob([data]).stream().pipeThrough(ds);
     return new Response(stream).arrayBuffer().then(function (ab) { return new TextDecoder().decode(ab); });
+  }
+  var ZIP_NONE = 'No WhatsApp _chat.txt or Telegram result.json found inside the zip, and no Instagram / Messenger message_1.json either.';
+  var META_FILE_RE = /(^|\/)message_\d+\.json$/i;
+  function pickZipEntry(real) {
+    return real.filter(function (x) { return /(^|\/)_chat\.txt$/i.test(x.name); })[0]
+      || real.filter(function (x) { return /(^|\/)result\.json$/i.test(x.name); }).sort(function (a, b) { return a.name.length - b.name.length; })[0];
+  }
+  // Kept for the WhatsApp / Telegram path (and old tests): resolves to the chat text.
+  function readZipChat(buf) {
+    var z; try { z = zipIndex(buf); } catch (err) { return Promise.reject(err); }
+    var e = pickZipEntry(z.entries) || z.entries.filter(function (x) { return /\.txt$/i.test(x.name); })[0];
+    if (!e) return Promise.reject(new Error(ZIP_NONE));
+    return zipText(z.b, e);
+  }
+  // v5: resolves to { text } (WhatsApp / Telegram) or { threads: metaThreads(...) } (Instagram / Messenger).
+  function readZipImport(buf) {
+    var z; try { z = zipIndex(buf); } catch (err) { return Promise.reject(err); }
+    var e = pickZipEntry(z.entries);
+    if (e) return zipText(z.b, e).then(function (t) { return { text: t }; });
+    var metas = z.entries.filter(function (x) { return META_FILE_RE.test(x.name); });
+    if (metas.length) {
+      return Promise.all(metas.map(function (x) {
+        return zipText(z.b, x).then(function (t) { var d = null; try { d = JSON.parse(t.replace(/^\ufeff/, '')); } catch (err) { d = null; } return { name: x.name, data: d }; });
+      })).then(function (files) {
+        var ok = files.filter(function (f) { return isMetaJson(f.data); });
+        if (!ok.length) throw new Error('The message_N.json files in this zip could not be read. Download your information again in JSON format (not HTML).');
+        return { threads: metaThreads(ok) };
+      });
+    }
+    var txt = z.entries.filter(function (x) { return /\.txt$/i.test(x.name); })[0];
+    if (txt) return zipText(z.b, txt).then(function (t) { return { text: t }; });
+    if (z.entries.some(function (x) { return /(^|\/)message_\d+\.html$/i.test(x.name); })) return Promise.reject(new Error('This Instagram / Messenger download is in HTML format. Request your information again and choose JSON as the format.'));
+    return Promise.reject(new Error(ZIP_NONE));
   }
 
   // ---------- Unlock-return storage (computed stats only, never chat text) ----------
@@ -597,7 +781,7 @@
     return Promise.resolve(p).then(function () { return 'shared'; }, function (err) { if (err && err.name === 'AbortError') return 'cancelled'; fallback(); return 'downloaded'; });
   }
 
-  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl, qrEncode: qrEncode, drawQR: drawQR, QR_URL: QR_URL, shareFile: shareFile, canShareFiles: canShareFiles, shareImage: shareImage, SHARE_CTA: SHARE_CTA };
+  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, readZipImport: readZipImport, parseMeta: parseMeta, fixMojibake: fixMojibake, isMetaJson: isMetaJson, metaThreads: metaThreads, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl, qrEncode: qrEncode, drawQR: drawQR, QR_URL: QR_URL, shareFile: shareFile, canShareFiles: canShareFiles, shareImage: shareImage, SHARE_CTA: SHARE_CTA };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
   root.Wrapped = api;
 
@@ -611,19 +795,55 @@
 
   function setStatus(msg, isErr) { var s = $('#status'); s.textContent = msg; s.className = 'status' + (isErr ? ' err' : ''); }
 
+  // v5: localized WhatsApp file names ("WhatsApp Chat mit X.txt", "Chat de WhatsApp con X.txt", ...). Best effort.
+  var WA_LABEL_RE = /(?:WhatsApp Chat (?:with |- |mit )|Chat de WhatsApp con |Conversa do WhatsApp com |Discussion WhatsApp avec |Chat WhatsApp con |WhatsApp-chat met )(.+?)(?:\.txt|\.zip)?$/i;
   function handleText(text, label) {
     var parsed;
     try { parsed = parseAny(text); }
     catch (err) { setStatus(err && err.friendly ? err.message : 'Could not read that file.', true); return; }
+    handleParsed(parsed, label);
+  }
+  function handleParsed(parsed, label) {
     if (!parsed.groupName && label && parsed.format === 'whatsapp') {
-      var m = /WhatsApp Chat (?:with |- )(.+?)(?:\.txt|\.zip)?$/i.exec(label);
+      var m = WA_LABEL_RE.exec(label);
       if (m) parsed.groupName = m[1];
     }
     var S = computeStats(parsed);
-    if (S.empty) { setStatus((parsed.format === 'telegram' ? 'We could not find any messages in that Telegram export. Make sure it is a group or chat export from Telegram Desktop in the "Machine-readable JSON" format.' : 'We could not find any chat messages in that file. Make sure it is a WhatsApp "Export chat" file (.txt or .zip) or a Telegram Desktop JSON export (result.json).'), true); return; }
+    if (S.empty) { setStatus((parsed.format === 'telegram' ? 'We could not find any messages in that Telegram export. Make sure it is a group or chat export from Telegram Desktop in the "Machine-readable JSON" format.' : parsed.format === 'meta' ? 'We could not find any messages in that Instagram or Messenger chat. Make sure your download includes Messages and covers the dates you want.' : 'We could not find any chat messages in that file. Make sure it is a WhatsApp "Export chat" file (.txt or .zip), a Telegram Desktop JSON export (result.json), or an Instagram / Messenger JSON download (.zip or message_1.json).'), true); return; }
+    $('#picker').hidden = true;
     state.stats = S;
     state.unlocked = state.paidMarker;
     showDeck(S);
+  }
+  // v5: a Meta download can hold many chats. Let the person pick one (titles are shown only here, on the device).
+  var PICKER_MAX = 40;
+  function showPicker(threads) {
+    var box = $('#picker'), list = $('#picker-list');
+    list.textContent = '';
+    threads.slice(0, PICKER_MAX).forEach(function (th) {
+      var b = el('button', 'btn btn-ghost picker-item');
+      b.type = 'button';
+      b.appendChild(el('span', 'picker-title', th.title));
+      b.appendChild(el('span', 'picker-count', th.count === 1 ? '1 message' : Math.round(th.count).toLocaleString('en-US') + ' messages'));
+      b.addEventListener('click', function () { openThread(th); });
+      list.appendChild(b);
+    });
+    $('#picker-more').hidden = threads.length <= PICKER_MAX;
+    $('#picker-more').textContent = threads.length > PICKER_MAX ? 'Showing the ' + PICKER_MAX + ' biggest of ' + threads.length + ' chats.' : '';
+    box.hidden = false;
+    setStatus('');
+    box.scrollIntoView({ block: 'start' });
+  }
+  function openThread(th) {
+    var parsed;
+    try { parsed = parseMeta(th.parts); }
+    catch (err) { setStatus(err && err.friendly ? err.message : 'Could not read that chat.', true); return; }
+    handleParsed(parsed, th.title);
+  }
+  function handleImport(r, label) {
+    if (r.text != null) return handleText(r.text, label);
+    if (r.threads.length === 1) return openThread(r.threads[0]);
+    showPicker(r.threads);
   }
 
   function showDeck(S) {
@@ -635,22 +855,37 @@
     setStatus('');
   }
 
+  function readBuf(file) {
+    return new Promise(function (res, rej) { var r = new FileReader(); r.onerror = function () { rej(new Error('Could not read that file.')); }; r.onload = function () { res(r.result); }; r.readAsArrayBuffer(file); });
+  }
+  function isZipBuf(buf, file) {
+    var b = new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
+    return (b.length === 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 3 && b[3] === 4) || /\.zip$/i.test(file.name) || /zip/i.test(file.type || ''); // "PK\3\4" = zip, whatever the name
+  }
   function handleFile(file) {
     if (!file) return;
     setStatus('Reading on your device…');
-    var isZip = /\.zip$/i.test(file.name) || /zip/i.test(file.type || '');
-    var reader = new FileReader();
-    reader.onerror = function () { setStatus('Could not read that file.', true); };
-    reader.onload = function () {
-      var b = new Uint8Array(reader.result, 0, Math.min(4, reader.result.byteLength));
-      if (b.length === 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 3 && b[3] === 4) isZip = true; // "PK\3\4" = zip, whatever the name
-      if (isZip) {
-        readZipChat(reader.result).then(function (t) { handleText(t, file.name); }, function (err) { setStatus(err.message, true); });
-      } else {
-        handleText(new TextDecoder().decode(reader.result), file.name);
+    $('#picker').hidden = true;
+    readBuf(file).then(function (buf) {
+      if (isZipBuf(buf, file)) return readZipImport(buf).then(function (r) { handleImport(r, file.name); });
+      handleText(new TextDecoder().decode(buf), file.name);
+    }).catch(function (err) { setStatus(err && err.message ? err.message : 'Could not read that file.', true); });
+  }
+  // v5: several files at once, e.g. message_1.json + message_2.json of one Instagram / Messenger chat.
+  function handleFiles(list) {
+    var files = Array.prototype.slice.call(list || []);
+    if (files.length <= 1) return handleFile(files[0]);
+    setStatus('Reading on your device…');
+    Promise.all(files.map(function (f) { return readBuf(f).then(function (b) { return { f: f, b: b }; }); })).then(function (all) {
+      if (all.some(function (x) { return isZipBuf(x.b, x.f); })) return handleFile(all.filter(function (x) { return isZipBuf(x.b, x.f); })[0].f);
+      var texts = all.map(function (x) { return new TextDecoder().decode(x.b); });
+      var sn = texts.map(sniffJson);
+      if (sn.every(function (j) { return j && j.format === 'meta'; })) {
+        var th = metaThreads(sn.map(function (j, i) { return { name: files[i].name, data: j.data }; }).map(function (x) { x.name = 'upload/' + x.name.replace(/^.*\//, ''); return x; }));
+        return openThread(th[0]);
       }
-    };
-    reader.readAsArrayBuffer(file);
+      setStatus('Please drop one chat file at a time (or, for Instagram / Messenger, the message_N.json files of one chat).', true);
+    }).catch(function (err) { setStatus(err && err.message ? err.message : 'Could not read those files.', true); });
   }
 
   function slide(kind, title) { var s = el('section', 'slide slide-' + kind); s.setAttribute('aria-roledescription', 'slide'); var inner = el('div', 'slide-inner'); s.appendChild(inner); if (title) inner.appendChild(el('p', 'slide-kicker', title)); return { node: s, inner: inner }; }
@@ -735,7 +970,7 @@
     var ul2 = el('ul', 'sum-awards');
     S.awards.slice(0, 6).forEach(function (a) { ul2.appendChild(el('li', null, a.emoji + ' ' + a.title + ': ' + a.winner)); });
     ss.inner.appendChild(ul2);
-    ss.inner.appendChild(el('p', 'slide-foot', 'made at zexley.com · stats computed by code, awards for fun · not affiliated with WhatsApp, Meta, Telegram, or Spotify'));
+    ss.inner.appendChild(el('p', 'slide-foot', 'made at zexley.com · stats computed by code, awards for fun · not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, or Spotify'));
     slides.push(ss);
 
     state.slides = slides;
@@ -920,7 +1155,9 @@
     x.fillText('made at zexley.com/wrapped · stats computed by code, awards for fun', 540, 1838);
     x.font = '400 26px ' + sans; x.fillStyle = '#b8ab92';
     x.fillText('AI-assisted product by Zexley · no AI reads your chat', 540, 1872);
-    x.fillText('Not affiliated with WhatsApp, Meta, Telegram, or Spotify', 540, 1904);
+    var naf = 'Not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, or Spotify', nfs = 26;
+    while (nfs > 18 && x.measureText(naf).width > 1000) { nfs--; x.font = '400 ' + nfs + 'px ' + sans; } // v5: longer list, keep it on the canvas
+    x.fillText(naf, 540, 1904);
     return c;
   }
   function saveBlob(blob) {
@@ -944,7 +1181,7 @@
   }
   api.drawShare = drawShare; api.nativeShare = nativeShare;
 
-  function reset() { state = { stats: null, slides: [], idx: 0, unlocked: false, paidMarker: state.paidMarker }; $('#deck-msg').hidden = true; $('#slides').textContent = ''; $('#deck').hidden = true; $('#intro').hidden = false; $('#paynote').hidden = true; $('#file').value = ''; setStatus(''); }
+  function reset() { state = { stats: null, slides: [], idx: 0, unlocked: false, paidMarker: state.paidMarker }; $('#deck-msg').hidden = true; $('#slides').textContent = ''; $('#deck').hidden = true; $('#intro').hidden = false; $('#paynote').hidden = true; $('#file').value = ''; $('#picker').hidden = true; setStatus(''); }
 
   function applyBrand() {
     doc.title = BRAND_NAME + ' — Zexley';
@@ -955,10 +1192,10 @@
   function init() {
     applyBrand();
     var drop = $('#drop'), file = $('#file');
-    file.addEventListener('change', function () { handleFile(file.files[0]); });
+    file.addEventListener('change', function () { handleFiles(file.files); });
     ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
     ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
-    drop.addEventListener('drop', function (e) { var f = e.dataTransfer && e.dataTransfer.files[0]; handleFile(f); });
+    drop.addEventListener('drop', function (e) { handleFiles(e.dataTransfer && e.dataTransfer.files); });
     $('#sample').addEventListener('click', function () { handleText($('#sample-chat').textContent, 'WhatsApp Chat - The Puddleworths 🎄 (sample).txt'); });
     $('#prev').addEventListener('click', function () { show(state.idx - 1); });
     $('#next').addEventListener('click', function () { show(state.idx + 1); });

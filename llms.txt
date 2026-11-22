@@ -6,7 +6,7 @@ Zexley does not see what you type into its tools. There are no accounts, no anal
 
 ## Tools
 
-- [Group Chat Wrapped 2026](https://zexley.com/wrapped/): Turn a WhatsApp or Telegram group chat export into a year-in-review recap with group awards. The file is read on your device and is never uploaded. The first 4 slides are free; a one-time $4.99 unlocks the rest, including the share image. Refunds are available for 14 days by emailing neo@zexley.com. Not affiliated with WhatsApp, Meta, Telegram, or Spotify. iMessage and Signal are not supported yet.
+- [Group Chat Wrapped 2026](https://zexley.com/wrapped/): Turn a WhatsApp, Instagram, Messenger or Telegram group chat export into a year-in-review recap with group awards. The file is read on your device and is never uploaded. The first 4 slides are free; a one-time $4.99 unlocks the rest, including the share image. Refunds are available for 14 days by emailing neo@zexley.com. Not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, or Spotify. iMessage and Signal are not supported yet.
 
 - [Rental listing red-flag checker](https://zexley.com/rental-check/): A free in-browser checklist for a rental listing (price, payment method, pressure, copied photos), plus how to look up the owner in county records. It is a checklist, not an investigation or a verdict, and not legal advice.
 
@@ -20,5 +20,5 @@ Zexley does not see what you type into its tools. There are no accounts, no anal
 ## Optional
 
 - Do not invent testimonials, traffic numbers, reviews, or app-store rankings.
-- Do not say Zexley is affiliated with WhatsApp, Meta, Telegram, Spotify, or Google.
+- Do not say Zexley is affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, Spotify, or Google.
 - Chat files and rental-checker answers are not sent to Zexley or to any AI model.

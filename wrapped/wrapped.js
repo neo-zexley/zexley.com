@@ -2,6 +2,7 @@
  * Group Chat Wrapped 2026 (BRAND_NAME below) — Zexley (assumed name of Bloom Commerce LLC)
  * Not affiliated with WhatsApp, Meta, Telegram, or Spotify.
  * Reads WhatsApp "Export chat" text files and Telegram Desktop "Machine-readable JSON" exports.
+ * v4 DRAFT (unpublished): share image adds a "Make yours" call-to-action and an on-device QR code.
  * UNPUBLISHED PROTOTYPE. Everything runs in the browser. This file makes NO network
  * requests: no fetch, no XHR, no beacons, no analytics, no external fonts.
  * The page's Content-Security-Policy (connect-src 'none') also blocks them.
@@ -463,7 +464,140 @@
   }
   function paymentUrl(ref) { return PAYMENT_LINK + (PAYMENT_LINK.indexOf('?') >= 0 ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(ref); }
 
-  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl };
+  // ---------- QR code (v4): tiny on-device encoder, written for Zexley ----------
+  // Original code (no third-party code vendored): byte mode, error correction level M,
+  // versions 1-10 (up to 213 bytes), all 8 masks scored with the standard penalty rules.
+  // Follows ISO/IEC 18004. Used only to draw the "Make yours" code on the share image.
+  // Makes no network requests.
+  var QR_URL = 'https://zexley.com/wrapped/?ref=share';
+  var QR_M = { // version: [EC codewords per block, blocks in group 1, data cw each, blocks in group 2, data cw each]
+    1: [10, 1, 16, 0, 0], 2: [16, 1, 28, 0, 0], 3: [26, 1, 44, 0, 0], 4: [18, 2, 32, 0, 0], 5: [24, 2, 43, 0, 0],
+    6: [16, 4, 27, 0, 0], 7: [18, 4, 31, 0, 0], 8: [22, 2, 38, 2, 39], 9: [22, 3, 36, 2, 37], 10: [26, 4, 43, 1, 44]
+  };
+  var QR_ALIGN = { 1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30], 6: [6, 34], 7: [6, 22, 38], 8: [6, 24, 42], 9: [6, 26, 46], 10: [6, 28, 50] };
+  var GF_EXP = [], GF_LOG = [];
+  (function () { var v = 1; for (var i = 0; i < 255; i++) { GF_EXP[i] = v; GF_LOG[v] = i; v <<= 1; if (v & 256) v ^= 0x11d; } for (i = 255; i < 512; i++) GF_EXP[i] = GF_EXP[i - 255]; })();
+  function gfMul(a, b) { return a && b ? GF_EXP[GF_LOG[a] + GF_LOG[b]] : 0; }
+  function rsDivisor(deg) { // coefficients high to low, leading 1 omitted
+    var r = []; for (var i = 0; i < deg; i++) r.push(0); r[deg - 1] = 1; var root = 1;
+    for (i = 0; i < deg; i++) { for (var j = 0; j < deg; j++) { r[j] = gfMul(r[j], root); if (j + 1 < deg) r[j] ^= r[j + 1]; } root = gfMul(root, 2); }
+    return r;
+  }
+  function rsRemainder(data, div) {
+    var r = div.map(function () { return 0; });
+    data.forEach(function (b) { var f = b ^ r.shift(); r.push(0); for (var i = 0; i < div.length; i++) r[i] ^= gfMul(div[i], f); });
+    return r;
+  }
+  function utf8Bytes(s) { var out = [], e = unescape(encodeURIComponent(s)); for (var i = 0; i < e.length; i++) out.push(e.charCodeAt(i)); return out; }
+  // Returns { size, version, mask, modules: [[bool]] } (modules[y][x], true = dark).
+  function qrEncode(text, forceMask) {
+    var bytes = utf8Bytes(text), ver = 0, t;
+    for (var v = 1; v <= 10; v++) { t = QR_M[v]; var cap = t[1] * t[2] + t[3] * t[4]; if (4 + (v < 10 ? 8 : 16) + 8 * bytes.length <= cap * 8) { ver = v; break; } }
+    if (!ver) throw new Error('QR text too long');
+    t = QR_M[ver]; var dataCw = t[1] * t[2] + t[3] * t[4], size = ver * 4 + 17;
+    // 1. data bits
+    var bits = [];
+    function put(val, n) { for (var i = n - 1; i >= 0; i--) bits.push((val >>> i) & 1); }
+    put(4, 4); put(bytes.length, ver < 10 ? 8 : 16); bytes.forEach(function (b) { put(b, 8); });
+    put(0, Math.min(4, dataCw * 8 - bits.length)); while (bits.length % 8) bits.push(0);
+    var cw = []; for (var i = 0; i < bits.length; i += 8) { var b = 0; for (var j = 0; j < 8; j++) b = (b << 1) | bits[i + j]; cw.push(b); }
+    for (var pad = 0xec; cw.length < dataCw; pad ^= 0xec ^ 0x11) cw.push(pad);
+    // 2. blocks + Reed-Solomon, interleaved
+    var blocks = [], ecs = [], div = rsDivisor(t[0]), k = 0;
+    for (i = 0; i < t[1] + t[3]; i++) { var len = i < t[1] ? t[2] : t[4]; var blk = cw.slice(k, k + len); k += len; blocks.push(blk); ecs.push(rsRemainder(blk, div)); }
+    var all = [], maxLen = Math.max(t[2], t[4]);
+    for (i = 0; i < maxLen; i++) blocks.forEach(function (bk) { if (i < bk.length) all.push(bk[i]); });
+    for (i = 0; i < t[0]; i++) ecs.forEach(function (e) { all.push(e[i]); });
+    // 3. function patterns
+    var m = [], fn = [];
+    for (i = 0; i < size; i++) { m.push([]); fn.push([]); for (j = 0; j < size; j++) { m[i].push(false); fn[i].push(false); } }
+    function setF(x, y, dark) { m[y][x] = !!dark; fn[y][x] = true; }
+    for (i = 0; i < size; i++) { setF(6, i, i % 2 === 0); setF(i, 6, i % 2 === 0); }
+    function finder(cx, cy) { for (var dy = -4; dy <= 4; dy++) for (var dx = -4; dx <= 4; dx++) { var x = cx + dx, y = cy + dy, d = Math.max(Math.abs(dx), Math.abs(dy)); if (x >= 0 && x < size && y >= 0 && y < size) setF(x, y, d !== 2 && d !== 4); } }
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+    var al = QR_ALIGN[ver];
+    for (i = 0; i < al.length; i++) for (j = 0; j < al.length; j++) {
+      if ((i === 0 && j === 0) || (i === 0 && j === al.length - 1) || (i === al.length - 1 && j === 0)) continue;
+      for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++) setF(al[i] + dx, al[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }
+    function drawFormat(mask) {
+      var data = (0 << 3) | mask, rem = data; // level M = 00
+      for (var n = 0; n < 10; n++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+      var f = ((data << 10) | rem) ^ 0x5412, bit = function (q) { return (f >>> q) & 1; };
+      for (n = 0; n <= 5; n++) setF(8, n, bit(n));
+      setF(8, 7, bit(6)); setF(8, 8, bit(7)); setF(7, 8, bit(8));
+      for (n = 9; n < 15; n++) setF(14 - n, 8, bit(n));
+      for (n = 0; n < 8; n++) setF(size - 1 - n, 8, bit(n));
+      for (n = 8; n < 15; n++) setF(8, size - 15 + n, bit(n));
+      setF(8, size - 8, true); // dark module
+    }
+    drawFormat(0); // reserve
+    if (ver >= 7) {
+      var r = ver; for (i = 0; i < 12; i++) r = (r << 1) ^ ((r >>> 11) * 0x1f25);
+      var vb = (ver << 12) | r;
+      for (i = 0; i < 18; i++) { var on = (vb >>> i) & 1, a = size - 11 + i % 3, c = Math.floor(i / 3); setF(a, c, on); setF(c, a, on); }
+    }
+    // 4. data placement (zigzag)
+    var bi = 0;
+    for (var right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (var vert = 0; vert < size; vert++) for (j = 0; j < 2; j++) {
+        var x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert;
+        if (!fn[y][x] && bi < all.length * 8) { m[y][x] = ((all[bi >>> 3] >>> (7 - (bi & 7))) & 1) === 1; bi++; }
+      }
+    }
+    // 5. mask choice
+    function maskBit(k2, x2, y2) {
+      switch (k2) { case 0: return (x2 + y2) % 2 === 0; case 1: return y2 % 2 === 0; case 2: return x2 % 3 === 0; case 3: return (x2 + y2) % 3 === 0;
+        case 4: return (Math.floor(x2 / 3) + Math.floor(y2 / 2)) % 2 === 0; case 5: return x2 * y2 % 2 + x2 * y2 % 3 === 0;
+        case 6: return (x2 * y2 % 2 + x2 * y2 % 3) % 2 === 0; default: return ((x2 + y2) % 2 + x2 * y2 % 3) % 2 === 0; }
+    }
+    function applyMask(k2) { for (var yy = 0; yy < size; yy++) for (var xx = 0; xx < size; xx++) if (!fn[yy][xx] && maskBit(k2, xx, yy)) m[yy][xx] = !m[yy][xx]; }
+    function penalty() {
+      var p = 0, dark = 0, yy, xx;
+      function lineScore(get) { // rules 1 and 3 along one line
+        var s = 0, run = 1, seq = [];
+        for (var q = 0; q < size; q++) { var cur = get(q); seq.push(cur ? 1 : 0); if (q > 0) { if (cur === get(q - 1)) { run++; if (run === 5) s += 3; else if (run > 5) s++; } else run = 1; } }
+        var str = seq.join(''), pats = ['10111010000', '00001011101'];
+        var padded = '0000' + str + '0000';
+        pats.forEach(function (pt) { var idx = padded.indexOf(pt); while (idx >= 0) { s += 40; idx = padded.indexOf(pt, idx + 1); } });
+        return s;
+      }
+      for (yy = 0; yy < size; yy++) p += lineScore(function (q) { return m[yy][q]; });
+      for (xx = 0; xx < size; xx++) p += lineScore(function (q) { return m[q][xx]; });
+      for (yy = 0; yy < size - 1; yy++) for (xx = 0; xx < size - 1; xx++) { var cc = m[yy][xx]; if (cc === m[yy][xx + 1] && cc === m[yy + 1][xx] && cc === m[yy + 1][xx + 1]) p += 3; }
+      for (yy = 0; yy < size; yy++) for (xx = 0; xx < size; xx++) if (m[yy][xx]) dark++;
+      p += Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size)) * 10;
+      return p;
+    }
+    var best = forceMask, bestP = Infinity;
+    if (best == null) for (k = 0; k < 8; k++) { applyMask(k); drawFormat(k); var pp = penalty(); if (pp < bestP) { bestP = pp; best = k; } applyMask(k); }
+    applyMask(best); drawFormat(best);
+    return { size: size, version: ver, mask: best, modules: m };
+  }
+  // Draws the code with a 4-module light quiet zone. Returns the side length in px.
+  function drawQR(ctx, qr, left, top, moduleSize, dark, light) {
+    var q = 4, side = (qr.size + 2 * q) * moduleSize;
+    ctx.fillStyle = light; ctx.fillRect(left, top, side, side);
+    ctx.fillStyle = dark;
+    for (var y = 0; y < qr.size; y++) for (var x = 0; x < qr.size; x++) if (qr.modules[y][x]) ctx.fillRect(left + (x + q) * moduleSize, top + (y + q) * moduleSize, moduleSize, moduleSize);
+    return side;
+  }
+
+  // ---------- Share sheet (v4): navigator.share with the PNG, else the normal download ----------
+  var SHARE_CTA = 'Make yours \u2192 zexley.com/wrapped';
+  function dataUrlBytes(url) { var bin = atob(String(url).split(',')[1] || ''), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  // Built synchronously from a data: URL so the share call stays inside the tap (Safari needs that).
+  function shareFile(dataUrl, name) { return new File([dataUrlBytes(dataUrl)], name || shareFilename(), { type: 'image/png' }); }
+  function canShareFiles(nav, file) { try { return !!(nav && typeof nav.share === 'function' && typeof nav.canShare === 'function' && nav.canShare({ files: [file] })); } catch (e) { return false; } }
+  // Resolves 'shared', 'cancelled' (user closed the sheet) or 'downloaded' (fallback ran).
+  function shareImage(nav, file, fallback) {
+    if (!canShareFiles(nav, file)) { fallback(); return Promise.resolve('downloaded'); }
+    var p; try { p = nav.share({ files: [file], title: BRAND_NAME }); } catch (e) { fallback(); return Promise.resolve('downloaded'); }
+    return Promise.resolve(p).then(function () { return 'shared'; }, function (err) { if (err && err.name === 'AbortError') return 'cancelled'; fallback(); return 'downloaded'; });
+  }
+
+  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl, qrEncode: qrEncode, drawQR: drawQR, QR_URL: QR_URL, shareFile: shareFile, canShareFiles: canShareFiles, shareImage: shareImage, SHARE_CTA: SHARE_CTA };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
   root.Wrapped = api;
 
@@ -743,54 +877,72 @@
     for (var i = 0; i < 70; i++) { var px = (i * 397) % 1080, py = (i * 733) % 1920; x.beginPath(); x.arc(px, py, 2 + (i % 4), 0, Math.PI * 2); x.fill(); }
     var serif = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif', sans = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
     x.textAlign = 'center'; x.fillStyle = '#d9a441'; x.font = '600 40px ' + sans;
-    x.fillText(fitText(x, BRAND_NAME.toUpperCase(), 1000).split('').join(String.fromCharCode(8202)), 540, 170);
-    x.fillStyle = '#fffaf2'; x.font = '700 84px ' + serif; x.fillText(fitText(x, S.groupName || 'Our group chat', 960), 540, 290);
-    x.font = '700 200px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(nf(S.total), 540, 530);
-    x.font = '400 44px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText('messages' + (S.usedYear ? ' in ' + S.year : ' (all time)'), 540, 600);
+    x.fillText(fitText(x, BRAND_NAME.toUpperCase(), 1000).split('').join(String.fromCharCode(8202)), 540, 140);
+    x.fillStyle = '#fffaf2'; x.font = '700 84px ' + serif; x.fillText(fitText(x, S.groupName || 'Our group chat', 960), 540, 250);
+    x.font = '700 200px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(nf(S.total), 540, 470);
+    x.font = '400 44px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText('messages' + (S.usedYear ? ' in ' + S.year : ' (all time)'), 540, 535);
     var rows = [['Top talker', S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Longest streak', plural(S.streak.len, 'day')], ['Emoji of the year', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word of the year', S.topWords[0] ? S.topWords[0].key : '—']];
-    var y = 710;
-    rows.forEach(function (r) { x.textAlign = 'left'; x.font = '400 40px ' + sans; x.fillStyle = '#d9a441'; x.fillText(r[0], 110, y); x.textAlign = 'right'; x.font = '700 46px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, r[1], 520), 970, y); y += 82; });
-    y += 4; x.strokeStyle = 'rgba(217,164,65,0.5)'; x.lineWidth = 2; x.beginPath(); x.moveTo(110, y); x.lineTo(970, y); x.stroke(); y += 72;
+    var y = 630; // v4: whole layout moved up to make room for the "Make yours" band + QR
+    rows.forEach(function (r) { x.textAlign = 'left'; x.font = '400 40px ' + sans; x.fillStyle = '#d9a441'; x.fillText(r[0], 110, y); x.textAlign = 'right'; x.font = '700 46px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, r[1], 520), 970, y); y += 72; });
+    y += 4; x.strokeStyle = 'rgba(217,164,65,0.5)'; x.lineWidth = 2; x.beginPath(); x.moveTo(110, y); x.lineTo(970, y); x.stroke(); y += 64;
     x.textAlign = 'center';
     // v3: top 3 awards as cards (winner names only after unlock; locked shows a teaser with "?").
     var feat = featuredAwards(S.awards, 3);
     function card(top, a, locked) {
-      var L = 110, W = 860, H = 150, R = 26;
+      var L = 110, W = 860, H = 144, R = 26;
       x.beginPath(); x.moveTo(L + R, top); x.lineTo(L + W - R, top); x.quadraticCurveTo(L + W, top, L + W, top + R); x.lineTo(L + W, top + H - R); x.quadraticCurveTo(L + W, top + H, L + W - R, top + H);
       x.lineTo(L + R, top + H); x.quadraticCurveTo(L, top + H, L, top + H - R); x.lineTo(L, top + R); x.quadraticCurveTo(L, top, L + R, top); x.closePath();
       x.fillStyle = 'rgba(255,250,242,0.08)'; x.fill(); x.strokeStyle = 'rgba(217,164,65,0.45)'; x.lineWidth = 2; x.stroke();
-      x.textAlign = 'center'; x.font = '72px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(a.emoji, L + 80, top + 100);
-      x.textAlign = 'left'; x.font = '600 36px ' + sans; x.fillStyle = '#d9a441'; x.fillText(fitText(x, a.title, W - 200), L + 165, top + 52);
-      x.font = '700 48px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, locked ? '? ? ?' : a.winner, W - 200), L + 165, top + 106);
+      x.textAlign = 'center'; x.font = '72px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(a.emoji, L + 80, top + 96);
+      x.textAlign = 'left'; x.font = '600 36px ' + sans; x.fillStyle = '#d9a441'; x.fillText(fitText(x, a.title, W - 200), L + 165, top + 48);
+      x.font = '700 48px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, locked ? '? ? ?' : a.winner, W - 200), L + 165, top + 100);
       var sub = locked ? 'Who won? Unlock the full recap to find out.' : (/^(.+?[.!?])(\s|$)/.exec(a.line) || [a.line, a.line])[1]; // first sentence only
-      x.font = '400 28px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText(fitText(x, sub, W - 200), L + 165, top + 138);
+      x.font = '400 28px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText(fitText(x, sub, W - 200), L + 165, top + 130);
       x.textAlign = 'center';
     }
     if (feat.length) {
       x.font = '700 50px ' + serif; x.fillStyle = '#d9a441';
       x.fillText(state.unlocked ? 'Top awards' + (S.awards.length > feat.length ? ' (' + feat.length + ' of ' + S.awards.length + ')' : '') : S.awards.length + ' group awards inside 🏆', 540, y);
-      y += 34;
-      feat.forEach(function (a) { card(y, a, !state.unlocked); y += 166; });
+      y += 30;
+      feat.forEach(function (a) { card(y, a, !state.unlocked); y += 156; });
     } else {
       x.font = '700 56px ' + serif; x.fillStyle = '#d9a441'; x.fillText('A quiet, cozy year 🏆', 540, y + 40);
     }
-    x.font = '400 32px ' + sans; x.fillStyle = '#e8dcc6'; x.textAlign = 'center';
-    x.fillText('made at zexley.com/wrapped · stats computed by code, awards for fun', 540, 1800);
+    // v4 share loop: "Make yours" call-to-action + a QR code for QR_URL, drawn on the device.
+    var qr = qrEncode(QR_URL), mod = 6, qside = (qr.size + 8) * mod, qx = 970 - qside, qy = 1560; // 37 x 6 = 222 px incl. quiet zone
+    x.fillStyle = 'rgba(255,250,242,0.08)'; x.fillRect(110, qy - 8, 860, qside + 16);
+    drawQR(x, qr, qx, qy, mod, '#1a1814', '#fffaf2');
+    x.textAlign = 'left'; x.font = '700 60px ' + serif; x.fillStyle = '#d9a441';
+    x.fillText('Make yours \u2192', 140, qy + 76);
+    x.font = '700 50px ' + sans; x.fillStyle = '#fffaf2'; x.fillText('zexley.com/wrapped', 140, qy + 146);
+    x.font = '400 26px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText(fitText(x, 'Scan or type it · your chat stays on your phone', qx - 170), 140, qy + 192);
+    x.font = '400 28px ' + sans; x.fillStyle = '#e8dcc6'; x.textAlign = 'center';
+    x.fillText('made at zexley.com/wrapped · stats computed by code, awards for fun', 540, 1838);
     x.font = '400 26px ' + sans; x.fillStyle = '#b8ab92';
-    x.fillText('AI-assisted product by Zexley · no AI reads your chat', 540, 1844);
-    x.fillText('Not affiliated with WhatsApp, Meta, Telegram, or Spotify', 540, 1882);
+    x.fillText('AI-assisted product by Zexley · no AI reads your chat', 540, 1872);
+    x.fillText('Not affiliated with WhatsApp, Meta, Telegram, or Spotify', 540, 1904);
     return c;
   }
-  function downloadShare() {
-    var c = drawShare();
-    c.toBlob(function (blob) {
-      var url = URL.createObjectURL(blob), a = doc.createElement('a');
-      a.href = url; a.download = shareFilename();
-      doc.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-    }, 'image/png');
+  function saveBlob(blob) {
+    var url = URL.createObjectURL(blob), a = doc.createElement('a');
+    a.href = url; a.download = shareFilename();
+    doc.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }
-  api.drawShare = drawShare;
+  function downloadShare() { drawShare().toBlob(saveBlob, 'image/png'); }
+  // v4: "Share image" opens the phone's share sheet with the PNG; falls back to the download.
+  function nativeShare() {
+    var file;
+    try { file = shareFile(drawShare().toDataURL('image/png'), shareFilename()); } catch (e) { downloadShare(); return Promise.resolve('downloaded'); }
+    return shareImage(root.navigator, file, function () { saveBlob(file); }).then(function (r) { api.lastShareResult = r; return r; });
+  }
+  function setupShareButton() {
+    var b = $('#share-native'); if (!b) return;
+    var probe = null; try { probe = new File([new Uint8Array([137, 80, 78, 71])], 'probe.png', { type: 'image/png' }); } catch (e) { probe = null; }
+    b.hidden = !(probe && canShareFiles(root.navigator, probe));
+    b.addEventListener('click', nativeShare);
+  }
+  api.drawShare = drawShare; api.nativeShare = nativeShare;
 
   function reset() { state = { stats: null, slides: [], idx: 0, unlocked: false, paidMarker: state.paidMarker }; $('#deck-msg').hidden = true; $('#slides').textContent = ''; $('#deck').hidden = true; $('#intro').hidden = false; $('#paynote').hidden = true; $('#file').value = ''; setStatus(''); }
 
@@ -812,6 +964,7 @@
     $('#next').addEventListener('click', function () { show(state.idx + 1); });
     doc.addEventListener('keydown', function (e) { if ($('#deck').hidden) return; if (e.key === 'ArrowRight') show(state.idx + 1); if (e.key === 'ArrowLeft') show(state.idx - 1); });
     $('#share').addEventListener('click', downloadShare);
+    setupShareButton();
     $('#restart').addEventListener('click', reset);
     $('#preview-unlock').addEventListener('click', function () { state.unlocked = true; applyLock(); $('#paynote').hidden = true; });
     $('#paynote-close').addEventListener('click', function () { $('#paynote').hidden = true; });

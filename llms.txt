@@ -29,6 +29,7 @@ Free how-to pages that cite official export help and lead to Group Chat Wrapped.
 - [How to download your Discord messages](https://zexley.com/guides/download-discord-messages/): Request Discord's data package from Data & Privacy (up to 30 days); it holds only your own messages, so the recap is personal.
 - [How to see who texts the most in a group chat](https://zexley.com/guides/who-texts-the-most-in-a-group-chat/): Why the apps do not show a tally, and how to count an export on your device.
 - [How to make a group chat year-in-review](https://zexley.com/guides/group-chat-year-in-review/): End-to-end recap for 2026.
+- [Group chat awards: 40+ superlative ideas](https://zexley.com/guides/group-chat-awards-ideas/): Kind award ideas to hand out yourselves, how to run an awards night, and which awards Group Chat Wrapped can count automatically.
 
 ## Optional
 

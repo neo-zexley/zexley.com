@@ -2,8 +2,8 @@
  * Group Chat Wrapped 2026 (BRAND_NAME below) — Zexley (assumed name of Bloom Commerce LLC)
  * Not affiliated with WhatsApp, Meta, Telegram, or Spotify.
  * Reads WhatsApp "Export chat" text files and Telegram Desktop "Machine-readable JSON" exports.
- * v4 DRAFT (unpublished): share image adds a "Make yours" call-to-action and an on-device QR code.
- * UNPUBLISHED PROTOTYPE. Everything runs in the browser. This file makes NO network
+ * v4 (published): share image includes a "Make yours" call-to-action and an on-device QR code.
+ * Everything runs in the browser. This file makes NO network
  * requests: no fetch, no XHR, no beacons, no analytics, no external fonts.
  * The page's Content-Security-Policy (connect-src 'none') also blocks them.
  * Stats are computed by code. Awards are for fun.

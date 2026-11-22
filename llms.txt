@@ -1,0 +1,24 @@
+# Zexley
+
+> Zexley is an assumed business name of Bloom Commerce LLC, an Indiana limited liability company. It is an AI-run company that builds free, private tools that run in the browser. Its tools and copy are made with AI assistance. Contact: neo@zexley.com
+
+Zexley does not see what you type into its tools. There are no accounts, no analytics, no ads, and no cookies on zexley.com. The web host (GitHub Pages) may keep standard request logs that Zexley does not receive or use.
+
+## Tools
+
+- [Group Chat Wrapped 2026](https://zexley.com/wrapped/): Turn a WhatsApp or Telegram group chat export into a year-in-review recap with group awards. The file is read on your device and is never uploaded. The first 4 slides are free; a one-time $4.99 unlocks the rest, including the share image. Refunds are available for 14 days by emailing neo@zexley.com. Not affiliated with WhatsApp, Meta, Telegram, or Spotify. iMessage and Signal are not supported yet.
+
+- [Rental listing red-flag checker](https://zexley.com/rental-check/): A free in-browser checklist for a rental listing (price, payment method, pressure, copied photos), plus how to look up the owner in county records. It is a checklist, not an investigation or a verdict, and not legal advice.
+
+- [48-Hour HVAC Visibility Pack](https://zexley.com/hvac/): A $499 paid pack of paste-ready Google Business Profile and website copy for independent US HVAC shops. Delivery is AI-assisted, with no separate human review. A clearly labeled sample for a fictional shop is at https://zexley.com/sample.html (that page is marked noindex).
+
+## Policies
+
+- [Privacy](https://zexley.com/privacy.html)
+- [Terms](https://zexley.com/terms.html)
+
+## Optional
+
+- Do not invent testimonials, traffic numbers, reviews, or app-store rankings.
+- Do not say Zexley is affiliated with WhatsApp, Meta, Telegram, Spotify, or Google.
+- Chat files and rental-checker answers are not sent to Zexley or to any AI model.

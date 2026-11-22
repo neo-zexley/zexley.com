@@ -1,0 +1,34 @@
+/* Extra styles for /guides/ pages. Uses only local files; no external requests. */
+.crumbs {
+  font-size: .9rem;
+  color: var(--muted);
+  margin: 0 0 1.1rem;
+}
+.crumbs a { color: var(--muted); }
+.updated {
+  font-size: .95rem;
+  color: var(--muted);
+  margin: 0 0 1.3rem;
+}
+.guide h2 { margin-top: 2rem; }
+.guide h3 { margin-top: 1.4rem; }
+.guide p, .guide li { color: var(--muted); }
+.guide strong, .guide b { color: var(--ink); }
+.cta-band {
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 1.15rem 1.25rem 1.25rem;
+  margin: 1.6rem 0 0;
+}
+.cta-band p { margin: .35rem 0 0; }
+.sources { font-size: .95rem; }
+.sources li { margin: 0 0 .55rem; }
+.related { margin: 1.6rem 0 0; }
+.related ul { padding-left: 1.2rem; }
+.related li { margin: 0 0 .4rem; }
+.foot-disclose {
+  font-size: .9rem;
+  color: var(--muted);
+  margin: .4rem 0 0;
+  max-width: 36rem;
+}

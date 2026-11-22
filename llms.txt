@@ -17,6 +17,18 @@ Zexley does not see what you type into its tools. There are no accounts, no anal
 - [Privacy](https://zexley.com/privacy.html)
 - [Terms](https://zexley.com/terms.html)
 
+## Guides
+
+Free how-to pages that cite official export help and lead to Group Chat Wrapped. They do not collect any information.
+
+- [Guides index](https://zexley.com/guides/): List of the export and recap guides.
+- [How to export a WhatsApp group chat](https://zexley.com/guides/export-whatsapp-group-chat/): Official iPhone and Android steps, plus Restricted chat limits.
+- [How to download Instagram DMs](https://zexley.com/guides/download-instagram-dms/): Accounts Center export, JSON format, wait times.
+- [How to export a Telegram chat](https://zexley.com/guides/export-telegram-chat/): Telegram Desktop, machine-readable JSON, result.json.
+- [How to download Messenger chat history](https://zexley.com/guides/download-messenger-chat-history/): Meta Accounts Center JSON export.
+- [How to see who texts the most in a group chat](https://zexley.com/guides/who-texts-the-most-in-a-group-chat/): Why the apps do not show a tally, and how to count an export on your device.
+- [How to make a group chat year-in-review](https://zexley.com/guides/group-chat-year-in-review/): End-to-end recap for 2026.
+
 ## Optional
 
 - Do not invent testimonials, traffic numbers, reviews, or app-store rankings.

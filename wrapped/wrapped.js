@@ -1,10 +1,11 @@
 /*
  * Group Chat Wrapped 2026 (BRAND_NAME below) — Zexley (assumed name of Bloom Commerce LLC)
- * Not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, or Spotify.
+ * Not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify.
  * Reads WhatsApp "Export chat" text files, Telegram Desktop "Machine-readable JSON" exports,
  * and (v5 draft) Instagram / Facebook Messenger chats from Meta's "Download your information" JSON export.
  * v4 (published): share image includes a "Make yours" call-to-action and an on-device QR code.
- * v5 (UNPUBLISHED draft): Instagram + Messenger JSON, non-English WhatsApp exports (de/es/pt/fr/it/nl).
+ * v5 (published): Instagram + Messenger JSON, non-English WhatsApp exports (de/es/pt/fr/it/nl).
+ * v6: Discord official data package (only YOUR OWN messages -> a personal recap). Zips are read in pieces.
  * Everything runs in the browser. This file makes NO network
  * requests: no fetch, no XHR, no beacons, no analytics, no external fonts.
  * The page's Content-Security-Policy (connect-src 'none') also blocks them.
@@ -321,28 +322,251 @@
     }).sort(function (a, b) { return b.count - a.count || (a.title < b.title ? -1 : 1); });
   }
 
+  // ---------- Discord (v6) ----------
+  // 1) Discord's official data package (User Settings > Data & Privacy > Request your data, with Messages selected).
+  //    A zip with Messages/ (older packages: messages/; the folder name may also be localized), one folder per
+  //    channel: c<channel id>/ (some newer packages drop the "c") holding channel.json
+  //    { id, type, name?, guild?: { id, name }, recipients?: [user ids] } and messages.json
+  //    [{ ID, Timestamp, Contents, Attachments }] (newer) or messages.csv with the same four columns (older),
+  //    plus Messages/index.json { "<channel id>": "<label>" }.
+  //    The package holds ONLY THE REQUESTING PERSON'S OWN MESSAGES, never anyone else's, so it makes a personal
+  //    recap (parsed.selfOnly), not a group one. Only these message files are opened. Account/ (email, IP,
+  //    payment details), Activity/, Servers/ and everything else in the package are never decompressed or read.
+  // 2) Also accepted, silently: a channel JSON shaped
+  //    { guild, channel, messages: [{ id, type, timestamp, content, author: { name, nickname, isBot }, ... }] }.
+  //    That shape includes every member's messages, so it makes a normal group recap. Not advertised.
+  var DISCORD_EPOCH = 1420070400000;
+  var DC_MSG_FILE_RE = /^(.*\/)?c?(\d{5,22})\/messages\.(json|csv)$/i;
+  var DC_SELF = 'You';
+  // A Discord ID ("snowflake") carries its creation time in UTC: (id >> 22) + 2015-01-01.
+  // Dividing a rounded JS number by 2^22 is still exact to the millisecond or so.
+  function snowflakeMs(id) {
+    var s = String(id == null ? '' : id).trim();
+    if (!/^\d{15,20}$/.test(s)) return NaN;
+    var ms = Math.floor(Number(s) / 4194304) + DISCORD_EPOCH;
+    return ms > DISCORD_EPOCH && ms < 4102444800000 ? ms : NaN;
+  }
+  // "2026-03-14 18:05:09", "2026-03-14 18:05:09.123000+00:00", "2026-03-14T18:05:09Z". No offset = UTC.
+  var DC_TS_RE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?\s*(Z|[+-]\d{2}:?\d{2})?$/i;
+  function discordTsMs(ts) {
+    var m = DC_TS_RE.exec(String(ts == null ? '' : ts).trim()); if (!m) return NaN;
+    var t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    if (m[7] && m[7].toUpperCase() !== 'Z') { var z = m[7].replace(':', ''), sg = z.charAt(0) === '-' ? -1 : 1; t -= sg * (+z.slice(1, 3) * 60 + +z.slice(3, 5)) * 60000; }
+    return t;
+  }
+  // The message ID is exact, so it wins; Timestamp is the fallback.
+  function discordRowMs(r) { var ms = snowflakeMs(r.ID != null ? r.ID : r.id); return isFinite(ms) ? ms : discordTsMs(r.Timestamp != null ? r.Timestamp : r.timestamp); }
+  // Custom emoji <:name:id> count as emoji ":name:"; mentions <@id>, <@&role>, @everyone, @here are counted, not read
+  // as words; channel links <#id>, timestamps <t:...> and slash-command links are dropped.
+  function discordText(raw) {
+    var cemoji = [], mentions = 0, t = clean(String(raw == null ? '' : raw));
+    t = t.replace(/<a?:([A-Za-z0-9_~]{1,64}):\d{5,22}>/g, function (_, n) { cemoji.push(':' + n + ':'); return ' '; });
+    t = t.replace(/<@[!&]?\d{5,22}>/g, function () { mentions++; return ' '; });
+    t = t.replace(/(^|\s)@(everyone|here)\b/g, function (_, sp) { mentions++; return sp + ' '; });
+    t = t.replace(/<#\d{5,22}>|<t:-?\d{1,13}(?::[tTdDfFR])?>|<\/[\w -]{1,64}:\d{5,22}>/g, ' ');
+    t = t.replace(/[ \t]{2,}/g, ' ').replace(/^\s+|\s+$/g, '');
+    return { text: t, cemoji: cemoji, mentions: mentions };
+  }
+  // Small RFC 4180 reader for the older messages.csv (quoted fields, "" escapes, line breaks inside quotes).
+  function parseCsv(text) {
+    var rows = [], row = [], f = '', q = false, s = String(text || '').replace(/^\ufeff/, ''), c;
+    for (var i = 0; i < s.length; i++) {
+      c = s.charAt(i);
+      if (q) { if (c === '"') { if (s.charAt(i + 1) === '"') { f += '"'; i++; } else q = false; } else f += c; }
+      else if (c === '"') q = true;
+      else if (c === ',') { row.push(f); f = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && s.charAt(i + 1) === '\n') i++; row.push(f); f = ''; rows.push(row); row = []; }
+      else f += c;
+    }
+    if (f !== '' || row.length) { row.push(f); rows.push(row); }
+    return rows;
+  }
+  var DC_CSV_HEAD_RE = /^\ufeff?\s*"?ID"?\s*,\s*"?Timestamp"?\s*,\s*"?Contents"?/i;
+  function discordCsvRows(text) {
+    var rows = parseCsv(text); if (!rows.length) return [];
+    var head = rows[0].map(function (h) { return h.trim(); });
+    return rows.slice(1).filter(function (r) { return r.length > 1 || (r[0] && r[0].trim()); }).map(function (r) { var o = {}; head.forEach(function (h, k) { o[h] = r[k] != null ? r[k] : ''; }); return o; });
+  }
+  function isDiscordRows(d) {
+    return Array.isArray(d) && (d.length === 0 || d.slice(0, 20).some(function (r) { return r && typeof r === 'object' && 'ID' in r && 'Timestamp' in r; }));
+  }
+  function isDiscordChannelJson(d) {
+    return !!d && typeof d === 'object' && !Array.isArray(d) && 'id' in d && 'type' in d && !('messages' in d) && (!!d.guild || Array.isArray(d.recipients) || 'name' in d);
+  }
+  function isDiscordIndexJson(d) {
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
+    var k = Object.keys(d);
+    return k.length > 0 && k.every(function (x) { return /^\d{5,22}$/.test(x) && (d[x] === null || typeof d[x] === 'string'); });
+  }
+  function isDceJson(d) {
+    return !!d && typeof d === 'object' && !Array.isArray(d) && !!d.channel && typeof d.channel === 'object' && !!d.guild && Array.isArray(d.messages) &&
+      (d.messages.length === 0 || d.messages.slice(0, 20).some(function (m) { return m && typeof m === 'object' && m.author && typeof m.author === 'object' && 'timestamp' in m; }));
+  }
+  function discordKind(ch, raw) {
+    var t = ch ? ch.type : null, ts = String(t == null ? '' : t).toUpperCase();
+    if (t === 1 || ts === 'DM') return 'dm';
+    if (t === 3 || ts === 'GROUP_DM') return 'group';
+    if (ch && (ch.guild || /^(GUILD|PUBLIC_THREAD|PRIVATE_THREAD|ANNOUNCEMENT)/.test(ts) || [0, 2, 5, 10, 11, 12, 13, 15, 16].indexOf(t) >= 0)) return 'server';
+    if (ch && Array.isArray(ch.recipients)) return ch.recipients.length > 2 ? 'group' : 'dm';
+    if (/^direct message with /i.test(raw || '')) return 'dm';
+    return 'unknown';
+  }
+  // Label for one channel. DM labels come from index.json ("Direct Message with ...") and are shown only on this
+  // device; the share image never names a DM (see shareChannel).
+  function discordChannelInfo(id, ch, index) {
+    var raw = index && typeof index[id] === 'string' ? clean(index[id]).trim() : '';
+    if (/^(none|null|unknown channel)$/i.test(raw)) raw = '';
+    var kind = discordKind(ch, raw);
+    var name = ch && typeof ch.name === 'string' ? clean(ch.name).trim() : '';
+    var guild = ch && ch.guild && typeof ch.guild === 'object' ? ch.guild : null;
+    var gname = guild && typeof guild.name === 'string' ? clean(guild.name).trim() : '';
+    var label;
+    if (kind === 'server') label = name ? '#' + name + (gname ? ' · ' + gname : '') : (raw || 'A server channel');
+    else if (kind === 'group') label = name || raw || 'A group DM';
+    else if (kind === 'dm') label = raw ? raw.replace(/^direct message with /i, 'DM with ') : 'A direct message';
+    else label = raw || name || 'A Discord channel';
+    return { id: String(id), label: label, kind: kind, guildKey: guild && guild.id != null ? String(guild.id) : (gname || null) };
+  }
+  function parseDiscordRows(rows, chId, opts) {
+    var out = [];
+    (rows || []).forEach(function (r) {
+      if (!r || typeof r !== 'object') return;
+      var ms = discordRowMs(r); if (!isFinite(ms)) return;
+      var c = discordText(r.Contents != null ? r.Contents : r.contents);
+      var a = r.Attachments != null ? r.Attachments : r.attachments;
+      var att = typeof a === 'string' ? a.split(/\s+/).filter(Boolean).length : (Array.isArray(a) ? a.length : 0);
+      var type = (c.text || c.cemoji.length || c.mentions) ? 'text' : (att ? 'media' : 'blank'); // blank: sticker, embed or poll only
+      var p = localParts(ms, opts);
+      out.push({ t: Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s), y: p.y, mo: p.mo, d: p.d, h: p.h, mi: p.mi, sender: DC_SELF, text: type === 'text' ? c.text : '', type: type,
+        att: type === 'text' ? att : 0, cemoji: c.cemoji, mentions: c.mentions, ch: String(chId) });
+    });
+    return out;
+  }
+  function discordRowsFromText(text) {
+    var body = String(text || '').replace(/^[\ufeff\s]+/, '');
+    if (DC_CSV_HEAD_RE.test(body)) return discordCsvRows(body);
+    var d; try { d = JSON.parse(body); } catch (e) { throw friendly('That Discord messages file could not be read. It may be cut off or damaged. Drop the whole data package .zip instead.'); }
+    if (!isDiscordRows(d)) throw friendly('That is not a Discord messages.json file.');
+    return d;
+  }
+  // One channel: { id, label, kind, guildKey, count, msgs }.
+  function discordChannel(id, rows, ch, index, opts) {
+    var info = discordChannelInfo(id, ch, index);
+    info.msgs = parseDiscordRows(rows, info.id, opts);
+    info.count = info.msgs.length;
+    return info;
+  }
+  // The parsed shape every stat uses. pickId = one channel id, or null for all of them.
+  function discordParsed(channels, pickId) {
+    var use = pickId == null ? channels : channels.filter(function (c) { return c.id === String(pickId); });
+    var msgs = [], info = {};
+    use.forEach(function (c) { info[c.id] = { label: c.label, kind: c.kind, guildKey: c.guildKey }; msgs = msgs.concat(c.msgs); });
+    msgs.sort(function (a, b) { return a.t - b.t; });
+    var title = pickId == null || !use.length ? (channels.length === 1 ? (channels[0].kind === 'unknown' ? 'Your Discord messages' : channels[0].label) : 'Your year on Discord') : use[0].label;
+    return { messages: msgs, dateOrder: 'ymd', groupName: title, format: 'discord', selfOnly: true, channels: info };
+  }
+  // For tests and single files: rows array, messages.json / messages.csv text, or { rows | text, channel, index, id }.
+  function parseDiscord(input, opts) {
+    var o = input && typeof input === 'object' && !Array.isArray(input) ? input : { rows: input };
+    var rows = o.rows != null ? (typeof o.rows === 'string' ? discordRowsFromText(o.rows) : o.rows) : discordRowsFromText(o.text);
+    var id = o.id != null ? String(o.id) : (o.channel && o.channel.id != null ? String(o.channel.id) : 'upload');
+    return discordParsed([discordChannel(id, rows, o.channel || null, o.index || null, opts)], null);
+  }
+  function parseJsonLoose(t) { try { return JSON.parse(String(t).replace(/^\ufeff/, '')); } catch (e) { return null; } }
+  // Reads only Messages/<channel>/{channel.json, messages.json|csv} and Messages/index.json, one channel at a time.
+  function readDiscordZip(z, opts) {
+    opts = opts || {};
+    var byLower = {}, dirs = {}, order = [];
+    z.entries.forEach(function (e) { byLower[e.name.toLowerCase()] = e; });
+    z.entries.forEach(function (e) {
+      var m = DC_MSG_FILE_RE.exec(e.name); if (!m) return;
+      var dir = e.name.replace(/[^\/]*$/, ''), key = dir.toLowerCase(), fmt = m[3].toLowerCase();
+      if (!dirs[key]) { dirs[key] = { dir: dir, id: m[2], entry: e, fmt: fmt }; order.push(key); }
+      else if (fmt === 'json' && dirs[key].fmt === 'csv') { dirs[key].entry = e; dirs[key].fmt = 'json'; } // newer file wins
+    });
+    var indexes = {}, channels = [], skipped = 0, done = 0;
+    function indexFor(dir) {
+      var parent = dir.replace(/[^\/]*\/$/, '').toLowerCase();
+      if (indexes[parent] !== undefined) return Promise.resolve(indexes[parent]);
+      var ie = byLower[parent + 'index.json'];
+      if (!ie) { indexes[parent] = null; return Promise.resolve(null); }
+      return zipText(z.src, ie).then(function (t) { var d = parseJsonLoose(t); indexes[parent] = isDiscordIndexJson(d) ? d : null; return indexes[parent]; }, function () { indexes[parent] = null; return null; });
+    }
+    var chain = Promise.resolve();
+    order.forEach(function (key) {
+      chain = chain.then(function () {
+        var d = dirs[key], ce = byLower[key + 'channel.json'];
+        return Promise.all([indexFor(d.dir), ce ? zipText(z.src, ce).then(parseJsonLoose, function () { return null; }) : null, zipText(z.src, d.entry)]).then(function (r) {
+          var rows; try { rows = d.fmt === 'csv' ? discordCsvRows(r[2]) : discordRowsFromText(r[2]); } catch (e) { skipped++; return; }
+          var c = discordChannel(d.id, rows, r[1] && typeof r[1] === 'object' ? r[1] : null, r[0], opts);
+          if (c.count) channels.push(c);
+        }, function () { skipped++; }).then(function () { done++; if (opts.onProgress) opts.onProgress(done, order.length); });
+      });
+    });
+    return chain.then(function () {
+      if (!channels.length) throw new Error(skipped ? 'The Discord message files in this zip could not be read. Download your data package again.' : 'This Discord data package has no messages from you in it.');
+      channels.sort(function (a, b) { return b.count - a.count || (a.label < b.label ? -1 : 1); });
+      return { channels: channels, skipped: skipped };
+    });
+  }
+  // Channel JSON with guild/channel/messages (best effort, not advertised): ordinary and reply messages only; joins, pins, calls,
+  // renames and thread notices are skipped, and so are bots. Times are shown in this device's time zone.
+  function parseDce(data, opts) {
+    if (typeof data === 'string') { data = parseJsonLoose(data); if (!isDceJson(data)) throw friendly('That JSON file isn’t in a format we can read.'); }
+    var msgs = [];
+    data.messages.forEach(function (m) {
+      if (!m || typeof m !== 'object' || !m.author || typeof m.author !== 'object' || m.author.isBot) return;
+      if (!/^(default|reply|0|19)$/i.test(String(m.type == null ? 'Default' : m.type))) return;
+      var ms = Date.parse(String(m.timestamp || '')); if (!isFinite(ms)) ms = snowflakeMs(m.id); if (!isFinite(ms)) return;
+      var sender = clean(String(m.author.nickname || m.author.name || '')).trim(); if (!sender) return;
+      var c = discordText(m.content), att = Array.isArray(m.attachments) ? m.attachments.length : 0;
+      var type = (c.text || c.cemoji.length || c.mentions) ? 'text' : (Array.isArray(m.stickers) && m.stickers.length) ? 'sticker' : (att || (Array.isArray(m.embeds) && m.embeds.length)) ? 'media' : null;
+      if (!type) return;
+      var p = localParts(ms, opts);
+      msgs.push({ t: Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s), y: p.y, mo: p.mo, d: p.d, h: p.h, mi: p.mi, sender: sender, text: type === 'text' ? c.text : '', type: type, att: type === 'text' ? att : 0, cemoji: c.cemoji, mentions: c.mentions });
+    });
+    msgs.sort(function (a, b) { return a.t - b.t; });
+    var ch = data.channel, g = data.guild || {}, nm = typeof ch.name === 'string' ? clean(ch.name).trim() : '';
+    var isDm = /^(direct|group)/i.test(String(ch.type || '')) || g.name === 'Direct Messages';
+    return { messages: msgs, dateOrder: 'ymd', groupName: nm ? (isDm ? nm : '#' + nm) : null, format: 'dce' };
+  }
+
   // Picks the parser by content, not by file name: Meta-shaped JSON (sender_name / timestamp_ms) = Instagram or
   // Messenger, any other JSON = Telegram (its parser explains what is wrong), else WhatsApp text.
+  // v6: a JSON array of { ID, Timestamp, Contents } (or a CSV with that header) = Discord data package messages;
+  // { guild, channel, messages[{ author, timestamp }] } = a channel JSON of that shape; Discord's channel.json / index.json alone
+  // get a clear error. Telegram's result.json has neither shape, so its detection is unchanged.
   function sniffJson(text) {
     var body = String(text || '').replace(/^[\ufeff\s]+/, ''), c = body.charAt(0);
     if (c !== '{' && c !== '[') return null;
     var data; try { data = JSON.parse(body); } catch (e) { return c === '{' ? { format: 'telegram', data: null } : null; }
-    return { format: isMetaJson(data) ? 'meta' : 'telegram', data: data };
+    if (isDiscordRows(data)) return { format: 'discord', data: data };
+    if (isDceJson(data)) return { format: 'dce', data: data };
+    if (isMetaJson(data)) return { format: 'meta', data: data };
+    if (isDiscordChannelJson(data) || isDiscordIndexJson(data)) return { format: 'discord-meta', data: data };
+    return { format: 'telegram', data: data };
   }
   function detectFormat(text) {
     var body = String(text || '').replace(/^[\ufeff\s]+/, ''), head = body.slice(0, 200);
     // "[" can start a JSON array or an iOS WhatsApp line like "[12/24/25, 9:14 PM] ..."; only real JSON counts.
     var j = sniffJson(body);
     if (j) return j.format;
+    if (DC_CSV_HEAD_RE.test(head)) return 'discord';
     if (head.charAt(0) === '[') return 'whatsapp';
     if (/^<(!doctype html|html)/i.test(head)) return 'html';
     return 'whatsapp';
   }
+  var DC_META_ERR = 'That is a Discord channel.json or index.json. It only names the channel. Drop the messages.json (or messages.csv) from the same folder, or better, the whole data package .zip.';
   function parseAny(text, opts) {
     var j = sniffJson(text);
+    if (j && j.format === 'discord') return parseDiscord({ rows: j.data }, opts);
+    if (j && j.format === 'dce') return parseDce(j.data, opts);
+    if (j && j.format === 'discord-meta') throw friendly(DC_META_ERR);
     if (j && j.format === 'meta') return parseMeta(j.data, opts);
     if (j) return parseTelegram(j.data === null ? String(text) : j.data);
-    if (detectFormat(text) === 'html') throw friendly('That looks like a web page, such as Telegram\'s HTML export. Export the chat again in Telegram Desktop and choose the format "Machine-readable JSON", then drop the result.json. (For Instagram or Messenger, request your information in JSON format, not HTML.)');
+    var f = detectFormat(text);
+    if (f === 'discord') return parseDiscord({ text: text }, opts);
+    if (f === 'html') throw friendly('That looks like a web page, such as Telegram\'s HTML export. Export the chat again in Telegram Desktop and choose the format "Machine-readable JSON", then drop the result.json. (For Instagram or Messenger, request your information in JSON format, not HTML.)');
     return parseChat(text);
   }
 
@@ -395,8 +619,10 @@
     msgs.forEach(function (m) { m.sender.toLowerCase().split(/[^\p{L}\p{N}']+/u).forEach(function (w) { if (w) nameWords[w] = 1; }); });
     function P(name) {
       return people[name] || (people[name] = { name: name, count: 0, words: 0, chars: 0, emojis: {}, emojiCount: 0, media: 0, sticker: 0, deleted: 0, laughs: 0, ok: 0, night: 0, early: 0, starts: 0, gaps: [], longest: null, questions: 0, exclaims: 0, hearts: 0,
-        links: 0, weekend: 0, lunch: 0, closes: 0, days: {} }); // v3: links, weekend, lunch, closes, days
+        links: 0, weekend: 0, lunch: 0, closes: 0, days: {}, // v3: links, weekend, lunch, closes, days
+        blank: 0, attText: 0, mentions: 0, bursts: 0 }); // v6 (Discord): no-text messages, text + attachment, @-mentions, quick follow-ups
     }
+    var chCount = {}; // v6: messages per Discord channel (personal recap)
     var prev = null;
     var SIX_H = 6 * 3600000, TWELVE_H = 12 * 3600000;
     msgs.forEach(function (m) {
@@ -414,10 +640,16 @@
       if (!prev || m.t - prev.t >= SIX_H) p.starts++;
       if (prev && m.t - prev.t >= SIX_H) P(prev.sender).closes++; // prev sent the last message before 6+ quiet hours
       if (prev && prev.sender !== m.sender && m.t - prev.t <= TWELVE_H) p.gaps.push(m.t - prev.t);
+      if (prev && prev.sender === m.sender && m.t - prev.t <= 60000) p.bursts++; // v6
+      if (m.ch != null) chCount[m.ch] = (chCount[m.ch] || 0) + 1; // v6
       prev = m;
       if (m.type === 'media') { p.media++; return; }
       if (m.type === 'sticker') { p.sticker++; return; }
       if (m.type === 'deleted') { p.deleted++; return; }
+      if (m.type === 'blank') { p.blank++; return; } // v6: Discord message with no text or attachment (sticker, embed, poll)
+      if (m.att) p.attText++;
+      if (m.mentions) p.mentions += m.mentions;
+      if (m.cemoji) m.cemoji.forEach(function (e) { p.emojis[e] = (p.emojis[e] || 0) + 1; emojis[e] = (emojis[e] || 0) + 1; p.emojiCount++; });
       var tx = m.text;
       p.chars += tx.length;
       if (!p.longest || tx.length > p.longest.text.length) p.longest = { text: tx, t: m.t };
@@ -437,7 +669,7 @@
         words[w] = (words[w] || 0) + 1;
       });
     });
-    var list = Object.keys(people).map(function (k) { var p = people[k]; p.share = p.count / msgs.length; p.medianGap = p.gaps.length >= 5 ? median(p.gaps) : Infinity; p.topEmoji = topOf(p.emojis); p.typed = p.count - p.media - p.sticker - p.deleted; p.avgLen = p.typed > 0 ? p.chars / p.typed : 0; p.dayCount = Object.keys(p.days).length; delete p.days; return p; })
+    var list = Object.keys(people).map(function (k) { var p = people[k]; p.share = p.count / msgs.length; p.medianGap = p.gaps.length >= 5 ? median(p.gaps) : Infinity; p.topEmoji = topOf(p.emojis); p.typed = p.count - p.media - p.sticker - p.deleted - p.blank; p.avgLen = p.typed > 0 ? p.chars / p.typed : 0; p.dayCount = Object.keys(p.days).length; delete p.days; return p; })
       .sort(function (a, b) { return b.count - a.count; });
     S.people = list;
     S.topTalker = list[0];
@@ -458,7 +690,8 @@
     S.topWords = topN(words, 5);
     S.laughs = list.reduce(function (s, p) { return s + p.laughs; }, 0);
     S.media = list.reduce(function (s, p) { return s + p.media + p.sticker; }, 0);
-    S.awards = assignAwards(list);
+    if (parsed.selfOnly) selfStats(S, list[0], chCount, parsed.channels || {}, msgs.length);
+    else S.awards = assignAwards(list);
     return S;
   }
 
@@ -522,38 +755,133 @@
     return out;
   }
 
+  // ---------- v6: personal recap (Discord data package = only your own messages) ----------
+  // Badges about the person's own habits. Counts only; no message text, links or exact times are shown or stored.
+  // A DM is never named in a badge line (the share image can show the first sentence of a line).
+  // "4 server channels in 2 servers and 3 DMs" (a group DM counts as a DM here).
+  function placesText(S) {
+    var srv = S.srvCount || 0, other = (S.channelCount || 0) - srv - (S.dmCount || 0), parts = [];
+    if (srv) parts.push(plural(srv, 'server channel') + (S.serverCount ? ' in ' + plural(S.serverCount, 'server') : ''));
+    if (S.dmCount) parts.push(plural(S.dmCount, 'DM'));
+    if (other > 0) parts.push(parts.length ? plural(other, 'other channel') : plural(other, 'channel'));
+    return parts.join(parts.length > 2 ? ', ' : ' and ') || plural(S.channelCount || 0, 'channel');
+  }
+  function nfx(n) { return Math.round(n).toLocaleString('en-US'); }
+  function placeName(c) { return !c ? 'one place' : c.kind === 'dm' ? 'one DM' : c.kind === 'group' ? 'one group DM' : c.kind === 'server' ? c.label : 'one channel'; }
+  var SELF_AWARDS = [
+    { id: 'owl', emoji: '🦉', title: 'Night Owl', metric: function (p) { return p.night; }, min: 3, short: function (p) { return nfx(p.night) + ' after midnight'; }, line: function (p) { return nfx(p.night) + ' of your messages went out between midnight and 4 AM. Sweet dreams eventually.'; } },
+    { id: 'bird', emoji: '🐦', title: 'Early Bird', metric: function (p) { return p.early; }, min: 3, short: function (p) { return nfx(p.early) + ' before 8 AM'; }, line: function (p) { return nfx(p.early) + ' messages between 5 and 8 AM. Up with the sun.'; } },
+    { id: 'hopper', emoji: '🧭', title: 'Server Hopper', metric: function (p, S) { return S.channelCount; }, min: 3, short: function (p, S) { return plural(S.channelCount, 'channel'); }, line: function (p, S) { return 'You posted in ' + placesText(S) + '. Everywhere at once.'; } },
+    { id: 'weekend', emoji: '🎉', title: 'Weekend Warrior', metric: function (p) { return p.weekend; }, min: 5, short: function (p) { return nfx(p.weekend) + ' on weekends'; }, line: function (p) { return nfx(p.weekend) + ' messages on Saturdays and Sundays. Weekends well spent.'; } },
+    { id: 'links', emoji: '🔗', title: 'Link Librarian', metric: function (p) { return p.links; }, min: 2, short: function (p) { return nfx(p.links) + ' links'; }, line: function (p) { return nfx(p.links) + ' links shared. Everyone\'s personal librarian.'; } },
+    { id: 'home', emoji: '🏠', title: 'Home Base', metric: function (p, S) { var c = S.topChannels[0]; return S.channelCount >= 2 && c ? Math.round(c.share * 100) : 0; }, min: 40, short: function (p, S) { return Math.round(S.topChannels[0].share * 100) + '% in one place'; }, line: function (p, S) { return Math.round(S.topChannels[0].share * 100) + '% of your messages went to ' + placeName(S.topChannels[0]) + '. Home sweet home.'; } },
+    { id: 'novel', emoji: '📜', title: 'Novelist in Residence', metric: function (p) { return p.longest ? p.longest.text.length : 0; }, min: 80, short: function (p) { return nfx(p.longest.text.length) + ' characters'; }, line: function (p) { return 'Your longest message of the year: ' + nfx(p.longest.text.length) + ' characters.'; } },
+    { id: 'laugh', emoji: '😂', title: 'Chief Laugh Officer', metric: function (p) { return p.laughs; }, min: 3, short: function (p) { return nfx(p.laughs) + ' laughs'; }, line: function (p) { return nfx(p.laughs) + ' laughs (haha, lol, 😂) sent.'; } },
+    { id: 'dm', emoji: '💌', title: 'DM Devotee', metric: function (p, S) { return S.total && S.dmMsgs / S.total >= 0.3 ? S.dmMsgs : 0; }, min: 10, short: function (p, S) { return nfx(S.dmMsgs) + ' in DMs'; }, line: function (p, S) { return nfx(S.dmMsgs) + ' of your messages were in DMs and group DMs. A true friend.'; } },
+    { id: 'emoji', emoji: '✨', title: 'Emoji Artist', metric: function (p) { return p.emojiCount; }, min: 5, short: function (p) { return nfx(p.emojiCount) + ' emoji'; }, line: function (p) { return nfx(p.emojiCount) + ' emoji, favorite: ' + (p.topEmoji ? p.topEmoji.key : '') + '.'; } },
+    { id: 'question', emoji: '❓', title: 'Question Master', metric: function (p) { return p.questions; }, min: 3, short: function (p) { return nfx(p.questions) + ' questions'; }, line: function (p) { return nfx(p.questions) + ' questions asked. Curiosity counts.'; } },
+    { id: 'hype', emoji: '📣', title: 'Hype Squad Captain', metric: function (p) { return p.exclaims; }, min: 3, short: function (p) { return nfx(p.exclaims) + ' exclamations'; }, line: function (p) { return nfx(p.exclaims) + ' messages with an exclamation point!'; } },
+    { id: 'media', emoji: '📎', title: 'Attachment Ace', metric: function (p) { return p.media + p.attText; }, min: 3, short: function (p) { return nfx(p.media + p.attText) + ' with attachments'; }, line: function (p) { return nfx(p.media + p.attText) + ' messages with photos, files or other attachments.'; } },
+    { id: 'ok', emoji: '👌', title: 'Master of Few Words', metric: function (p) { return p.ok; }, min: 3, short: function (p) { return nfx(p.ok) + ' "ok"s'; }, line: function (p) { return nfx(p.ok) + ' perfectly efficient "k"s and "ok"s.'; } },
+    { id: 'roll', emoji: '⚡', title: 'On a Roll', metric: function (p) { return p.bursts; }, min: 10, short: function (p) { return nfx(p.bursts) + ' rapid follow-ups'; }, line: function (p) { return nfx(p.bursts) + ' messages sent within a minute of your previous one. On a roll.'; } },
+    { id: 'essay', emoji: '✍️', title: 'Essay Writer', metric: function (p) { return p.typed >= 5 ? Math.round(p.avgLen) : 0; }, min: 30, short: function (p) { return Math.round(p.avgLen) + ' characters on average'; }, line: function (p) { return 'Your typed messages averaged ' + Math.round(p.avgLen) + ' characters. Every word counted.'; } },
+    { id: 'lunch', emoji: '🥪', title: 'Lunch Break Legend', metric: function (p) { return p.lunch; }, min: 3, short: function (p) { return nfx(p.lunch) + ' over lunch'; }, line: function (p) { return nfx(p.lunch) + ' messages between noon and 2 PM. Chatting over lunch.'; } },
+    { id: 'heart', emoji: '❤️', title: 'Warmest Heart', metric: function (p) { return p.hearts; }, min: 3, short: function (p) { return nfx(p.hearts) + ' hearts'; }, line: function (p) { return nfx(p.hearts) + ' hearts and "love you"s sent.'; } },
+    { id: 'shout', emoji: '🙌', title: 'Shout-out Giver', metric: function (p) { return p.mentions; }, min: 3, short: function (p) { return nfx(p.mentions) + ' @-mentions'; }, line: function (p) { return 'You @-mentioned people or roles ' + nfx(p.mentions) + ' times. Always looping people in.'; } },
+    { id: 'regular', emoji: '📅', title: 'Always Around', metric: function (p) { return p.dayCount; }, min: 3, short: function (p) { return plural(p.dayCount, 'day'); }, line: function (p) { return 'You showed up on ' + p.dayCount + ' different days.'; } }
+  ];
+  function assignSelfAwards(p, S) {
+    var out = [];
+    SELF_AWARDS.forEach(function (a) {
+      var v = a.metric(p, S);
+      if (!isFinite(v) || v <= 0 || v < a.min) return;
+      out.push({ id: a.id, emoji: a.emoji, title: a.title, winner: DC_SELF, short: a.short(p, S), line: a.line(p, S) });
+    });
+    return out.slice(0, MAX_AWARDS);
+  }
+  function selfStats(S, p, chCount, info, total) {
+    S.selfOnly = true;
+    S.topChannels = topN(chCount, 8).map(function (c) { var i = info[c.key] || {}; return { label: i.label || 'A Discord channel', kind: i.kind || 'unknown', count: c.count, share: c.count / total }; });
+    var guilds = {}; S.dmMsgs = 0; S.dmCount = 0; S.srvCount = 0;
+    Object.keys(chCount).forEach(function (k) { var i = info[k] || {}; if (i.kind === 'server') { S.srvCount++; if (i.guildKey) guilds[i.guildKey] = 1; } if (i.kind === 'dm' || i.kind === 'group') { S.dmMsgs += chCount[k]; S.dmCount++; } });
+    S.channelCount = Object.keys(chCount).length;
+    S.serverCount = Object.keys(guilds).length;
+    S.links = p.links; S.mentions = p.mentions; S.attachments = p.media + p.attText;
+    S.awards = assignSelfAwards(p, S);
+  }
+
   // ---------- ZIP (reads _chat.txt with the browser's own DecompressionStream) ----------
   function u16(b, o) { return b[o] | (b[o + 1] << 8); }
   function u32(b, o) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
   // v5: the zip reading is split into zipIndex (central directory) + zipText (one entry) so a Meta export
   // with message_1.json, message_2.json ... (possibly for many chats) can be read with the same code.
-  function zipIndex(buf) {
-    var b = new Uint8Array(buf), i, eocd = -1;
-    for (i = b.length - 22; i >= Math.max(0, b.length - 65557); i--) if (u32(b, i) === 0x06054b50) { eocd = i; break; }
-    if (eocd < 0) throw new Error('This does not look like a zip file.');
-    var n = u16(b, eocd + 10), off = u32(b, eocd + 16), entries = [];
-    for (i = 0; i < n && u32(b, off) === 0x02014b50; i++) {
-      var nameLen = u16(b, off + 28), extraLen = u16(b, off + 30), comLen = u16(b, off + 32);
-      var name = new TextDecoder().decode(b.subarray(off + 46, off + 46 + nameLen));
-      entries.push({ name: name, method: u16(b, off + 10), csize: u32(b, off + 20), local: u32(b, off + 42) });
-      off += 46 + nameLen + extraLen + comLen;
+  // v6: both work on a "source" that is either bytes already in memory or a File/Blob. For a File only the
+  // pieces that are needed are read (the end of the zip, the central directory, then each wanted entry,
+  // streamed through DecompressionStream), so a large Discord or Meta package is never loaded whole.
+  // Zip64 (over 4 GB or 65,535 entries) is understood too.
+  function u64(b, o) { return u32(b, o) + u32(b, o + 4) * 4294967296; }
+  function readBlobBytes(blob) {
+    if (typeof blob.arrayBuffer === 'function') return blob.arrayBuffer().then(function (ab) { return new Uint8Array(ab); });
+    return new Promise(function (res, rej) { var r = new FileReader(); r.onerror = function () { rej(new Error('Could not read that file.')); }; r.onload = function () { res(new Uint8Array(r.result)); }; r.readAsArrayBuffer(blob); });
+  }
+  function zipSource(x) {
+    if (typeof Blob !== 'undefined' && x instanceof Blob) {
+      return { size: x.size, read: function (s, e) { return readBlobBytes(x.slice(s, e)); }, blob: function (s, e) { return x.slice(s, e); } };
     }
-    var real = entries.filter(function (x) { return !/(^|\/)__MACOSX\//.test(x.name) && !/(^|\/)\._/.test(x.name); });
-    return { b: b, entries: real };
+    var b = x instanceof Uint8Array ? x : new Uint8Array(x);
+    return { size: b.length, read: function (s, e) { return Promise.resolve(b.subarray(s, Math.min(e, b.length))); }, blob: function (s, e) { return new Blob([b.subarray(s, e)]); } };
   }
-  function zipText(b, e) {
-    var lo = e.local;
-    if (u32(b, lo) !== 0x04034b50) return Promise.reject(new Error('Zip entry is damaged.'));
-    var start = lo + 30 + u16(b, lo + 26) + u16(b, lo + 28);
-    var data = b.subarray(start, start + e.csize);
-    if (e.method === 0) return Promise.resolve(new TextDecoder().decode(data));
-    if (e.method !== 8) return Promise.reject(new Error('Unsupported zip compression.'));
-    if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('Your browser cannot unzip here. Unzip the file and drop the _chat.txt (WhatsApp), result.json (Telegram) or message_1.json (Instagram / Messenger) instead.'));
-    var ds = new DecompressionStream('deflate-raw');
-    var stream = new Blob([data]).stream().pipeThrough(ds);
-    return new Response(stream).arrayBuffer().then(function (ab) { return new TextDecoder().decode(ab); });
+  function zipIndex(src) {
+    var tailLen = Math.min(src.size, 65557 + 20), tailStart = src.size - tailLen;
+    return src.read(tailStart, src.size).then(function (t) {
+      var i, eocd = -1;
+      for (i = t.length - 22; i >= 0; i--) if (u32(t, i) === 0x06054b50) { eocd = i; break; }
+      if (eocd < 0) throw new Error('This does not look like a zip file.');
+      var n = u16(t, eocd + 10), cdSize = u32(t, eocd + 12), cdOff = u32(t, eocd + 16);
+      var z64 = (n === 0xffff || cdSize === 0xffffffff || cdOff === 0xffffffff) && eocd >= 20 && u32(t, eocd - 20) === 0x07064b50;
+      var ready = Promise.resolve();
+      if (z64) {
+        var z64at = u64(t, eocd - 12);
+        ready = src.read(z64at, z64at + 56).then(function (z) {
+          if (z.length < 56 || u32(z, 0) !== 0x06064b50) throw new Error('This zip file is damaged.');
+          n = u64(z, 32); cdSize = u64(z, 40); cdOff = u64(z, 48);
+        });
+      }
+      return ready.then(function () { return src.read(cdOff, cdOff + cdSize); }).then(function (b) {
+        var off = 0, entries = [], dec = new TextDecoder();
+        for (var k = 0; k < n && off + 46 <= b.length && u32(b, off) === 0x02014b50; k++) {
+          var nameLen = u16(b, off + 28), extraLen = u16(b, off + 30), comLen = u16(b, off + 32);
+          var e = { name: dec.decode(b.subarray(off + 46, off + 46 + nameLen)), method: u16(b, off + 10), csize: u32(b, off + 20), usize: u32(b, off + 24), local: u32(b, off + 42) };
+          if (e.usize === 0xffffffff || e.csize === 0xffffffff || e.local === 0xffffffff) { // zip64 extra field (id 1)
+            for (var x = off + 46 + nameLen, xe = x + extraLen; x + 4 <= xe; x += 4 + u16(b, x + 2)) {
+              if (u16(b, x) !== 1) continue;
+              var q = x + 4;
+              if (e.usize === 0xffffffff) { e.usize = u64(b, q); q += 8; }
+              if (e.csize === 0xffffffff) { e.csize = u64(b, q); q += 8; }
+              if (e.local === 0xffffffff) e.local = u64(b, q);
+              break;
+            }
+          }
+          entries.push(e);
+          off += 46 + nameLen + extraLen + comLen;
+        }
+        var real = entries.filter(function (x) { return !/(^|\/)__MACOSX\//.test(x.name) && !/(^|\/)\._/.test(x.name); });
+        return { src: src, entries: real };
+      });
+    });
   }
-  var ZIP_NONE = 'No WhatsApp _chat.txt or Telegram result.json found inside the zip, and no Instagram / Messenger message_1.json either.';
+  function zipText(src, e) {
+    return src.read(e.local, e.local + 30).then(function (h) {
+      if (h.length < 30 || u32(h, 0) !== 0x04034b50) throw new Error('Zip entry is damaged.');
+      var start = e.local + 30 + u16(h, 26) + u16(h, 28);
+      if (e.method === 0) return src.read(start, start + e.csize).then(function (d) { return new TextDecoder().decode(d); });
+      if (e.method !== 8) throw new Error('Unsupported zip compression.');
+      if (typeof DecompressionStream === 'undefined') throw new Error('Your browser cannot unzip here. Unzip the file and drop the _chat.txt (WhatsApp), result.json (Telegram), message_1.json (Instagram / Messenger) or a messages.json (Discord) instead.');
+      var stream = src.blob(start, start + e.csize).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      return new Response(stream).arrayBuffer().then(function (ab) { return new TextDecoder().decode(ab); });
+    });
+  }
+  var ZIP_NONE = 'No WhatsApp _chat.txt or Telegram result.json found inside the zip, and no Instagram / Messenger message_1.json or Discord messages folder either.';
   var META_FILE_RE = /(^|\/)message_\d+\.json$/i;
   function pickZipEntry(real) {
     return real.filter(function (x) { return /(^|\/)_chat\.txt$/i.test(x.name); })[0]
@@ -561,30 +889,38 @@
   }
   // Kept for the WhatsApp / Telegram path (and old tests): resolves to the chat text.
   function readZipChat(buf) {
-    var z; try { z = zipIndex(buf); } catch (err) { return Promise.reject(err); }
-    var e = pickZipEntry(z.entries) || z.entries.filter(function (x) { return /\.txt$/i.test(x.name); })[0];
-    if (!e) return Promise.reject(new Error(ZIP_NONE));
-    return zipText(z.b, e);
+    var src; try { src = zipSource(buf); } catch (err) { return Promise.reject(err); }
+    return zipIndex(src).then(function (z) {
+      var e = pickZipEntry(z.entries) || z.entries.filter(function (x) { return /\.txt$/i.test(x.name); })[0];
+      if (!e) throw new Error(ZIP_NONE);
+      return zipText(z.src, e);
+    });
   }
   // v5: resolves to { text } (WhatsApp / Telegram) or { threads: metaThreads(...) } (Instagram / Messenger).
-  function readZipImport(buf) {
-    var z; try { z = zipIndex(buf); } catch (err) { return Promise.reject(err); }
-    var e = pickZipEntry(z.entries);
-    if (e) return zipText(z.b, e).then(function (t) { return { text: t }; });
-    var metas = z.entries.filter(function (x) { return META_FILE_RE.test(x.name); });
-    if (metas.length) {
-      return Promise.all(metas.map(function (x) {
-        return zipText(z.b, x).then(function (t) { var d = null; try { d = JSON.parse(t.replace(/^\ufeff/, '')); } catch (err) { d = null; } return { name: x.name, data: d }; });
-      })).then(function (files) {
-        var ok = files.filter(function (f) { return isMetaJson(f.data); });
-        if (!ok.length) throw new Error('The message_N.json files in this zip could not be read. Download your information again in JSON format (not HTML).');
-        return { threads: metaThreads(ok) };
-      });
-    }
-    var txt = z.entries.filter(function (x) { return /\.txt$/i.test(x.name); })[0];
-    if (txt) return zipText(z.b, txt).then(function (t) { return { text: t }; });
-    if (z.entries.some(function (x) { return /(^|\/)message_\d+\.html$/i.test(x.name); })) return Promise.reject(new Error('This Instagram / Messenger download is in HTML format. Request your information again and choose JSON as the format.'));
-    return Promise.reject(new Error(ZIP_NONE));
+  // v6: or { discord: { channels } } for a Discord data package. `buf` may also be a File / Blob (read in pieces).
+  // opts.onProgress(done, total) is called while Discord channels are read.
+  function readZipImport(buf, opts) {
+    var src; try { src = zipSource(buf); } catch (err) { return Promise.reject(err); }
+    return zipIndex(src).then(function (z) {
+      var e = pickZipEntry(z.entries);
+      if (e) return zipText(z.src, e).then(function (t) { return { text: t }; });
+      if (z.entries.some(function (x) { return DC_MSG_FILE_RE.test(x.name); })) return readDiscordZip(z, opts).then(function (pkg) { return { discord: pkg }; });
+      var metas = z.entries.filter(function (x) { return META_FILE_RE.test(x.name); });
+      if (metas.length) {
+        return Promise.all(metas.map(function (x) {
+          return zipText(z.src, x).then(function (t) { var d = null; try { d = JSON.parse(t.replace(/^\ufeff/, '')); } catch (err) { d = null; } return { name: x.name, data: d }; });
+        })).then(function (files) {
+          var ok = files.filter(function (f) { return isMetaJson(f.data); });
+          if (!ok.length) throw new Error('The message_N.json files in this zip could not be read. Download your information again in JSON format (not HTML).');
+          return { threads: metaThreads(ok) };
+        });
+      }
+      var txt = z.entries.filter(function (x) { return /\.txt$/i.test(x.name); })[0];
+      if (txt) return zipText(z.src, txt).then(function (t) { return { text: t }; });
+      if (z.entries.some(function (x) { return /(^|\/)message_\d+\.html$/i.test(x.name); })) throw new Error('This Instagram / Messenger download is in HTML format. Request your information again and choose JSON as the format.');
+      if (z.entries.some(function (x) { return /(^|\/)(account\/user\.json|servers\/index\.json)$/i.test(x.name); })) throw new Error('This Discord data package has no messages in it. Request your data again and make sure Messages is selected.');
+      throw new Error(ZIP_NONE);
+    });
   }
 
   // ---------- Unlock-return storage (computed stats only, never chat text) ----------
@@ -595,7 +931,9 @@
   // working data (longest message text, reply gaps, emoji maps) so no message text is kept.
   function toStoredStats(S) {
     var person = function (p) { return { name: p.name, count: p.count, share: p.share, topEmoji: p.topEmoji ? { key: p.topEmoji.key, count: p.topEmoji.count } : null }; };
-    var o = pick(S, ['year', 'usedYear', 'total', 'totalAll', 'groupName', 'first', 'last', 'activeDays', 'span', 'perDay', 'laughs', 'media']);
+    var o = pick(S, ['year', 'usedYear', 'total', 'totalAll', 'groupName', 'first', 'last', 'activeDays', 'span', 'perDay', 'laughs', 'media',
+      'selfOnly', 'channelCount', 'serverCount', 'srvCount', 'dmMsgs', 'dmCount', 'links', 'mentions', 'attachments']); // v6: Discord personal-recap counts
+    if (S.topChannels) o.topChannels = S.topChannels.map(function (c) { return pick(c, ['label', 'kind', 'count', 'share']); });
     o.people = (S.people || []).map(person);
     o.topTalker = S.topTalker ? person(S.topTalker) : null;
     o.busiestDay = pick(S.busiestDay, ['t', 'count']);
@@ -604,7 +942,7 @@
     o.streak = pick(S.streak, ['len', 'start', 'end']);
     o.topEmojis = (S.topEmojis || []).map(function (e) { return { key: e.key, count: e.count }; });
     o.topWords = (S.topWords || []).map(function (e) { return { key: e.key, count: e.count }; });
-    o.awards = (S.awards || []).map(function (a) { return pick(a, ['id', 'emoji', 'title', 'winner', 'line']); });
+    o.awards = (S.awards || []).map(function (a) { return pick(a, ['id', 'emoji', 'title', 'winner', 'short', 'line']); });
     return o;
   }
   function randomRef() {
@@ -781,13 +1119,17 @@
     return Promise.resolve(p).then(function () { return 'shared'; }, function (err) { if (err && err.name === 'AbortError') return 'cancelled'; fallback(); return 'downloaded'; });
   }
 
-  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, readZipImport: readZipImport, parseMeta: parseMeta, fixMojibake: fixMojibake, isMetaJson: isMetaJson, metaThreads: metaThreads, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl, qrEncode: qrEncode, drawQR: drawQR, QR_URL: QR_URL, shareFile: shareFile, canShareFiles: canShareFiles, shareImage: shareImage, SHARE_CTA: SHARE_CTA };
+  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, readZipImport: readZipImport, parseMeta: parseMeta, fixMojibake: fixMojibake, isMetaJson: isMetaJson, metaThreads: metaThreads, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl, qrEncode: qrEncode, drawQR: drawQR, QR_URL: QR_URL, shareFile: shareFile, canShareFiles: canShareFiles, shareImage: shareImage, SHARE_CTA: SHARE_CTA,
+    // v6 (Discord)
+    parseDiscord: parseDiscord, parseDce: parseDce, parseCsv: parseCsv, discordCsvRows: discordCsvRows, snowflakeMs: snowflakeMs, discordTsMs: discordTsMs, discordText: discordText,
+    discordParsed: discordParsed, discordChannelInfo: discordChannelInfo, isDiscordRows: isDiscordRows, isDceJson: isDceJson, sniffJson: sniffJson, SELF_AWARDS: SELF_AWARDS, assignSelfAwards: assignSelfAwards, placesText: placesText };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
   root.Wrapped = api;
 
   // ===================== Browser UI =====================
   var doc = root.document;
   var state = { stats: null, slides: [], idx: 0, unlocked: false, paidMarker: false };
+  var SELF_NOTE = 'Only your own messages: Discord’s data package doesn’t include anyone else’s.';
   function $(s) { return doc.querySelector(s); }
   function el(tag, cls, text) { var e = doc.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function nf(n) { return Math.round(n).toLocaleString('en-US'); }
@@ -809,7 +1151,7 @@
       if (m) parsed.groupName = m[1];
     }
     var S = computeStats(parsed);
-    if (S.empty) { setStatus((parsed.format === 'telegram' ? 'We could not find any messages in that Telegram export. Make sure it is a group or chat export from Telegram Desktop in the "Machine-readable JSON" format.' : parsed.format === 'meta' ? 'We could not find any messages in that Instagram or Messenger chat. Make sure your download includes Messages and covers the dates you want.' : 'We could not find any chat messages in that file. Make sure it is a WhatsApp "Export chat" file (.txt or .zip), a Telegram Desktop JSON export (result.json), or an Instagram / Messenger JSON download (.zip or message_1.json).'), true); return; }
+    if (S.empty) { setStatus((parsed.format === 'discord' ? 'We could not find any messages from you in that Discord file. Make sure your data request included Messages, then drop the whole data package .zip (or a messages.json from inside its Messages folder).' : parsed.format === 'dce' ? 'We could not find any messages in that file.' : parsed.format === 'telegram' ? 'We could not find any messages in that Telegram export. Make sure it is a group or chat export from Telegram Desktop in the "Machine-readable JSON" format.' : parsed.format === 'meta' ? 'We could not find any messages in that Instagram or Messenger chat. Make sure your download includes Messages and covers the dates you want.' : 'We could not find any chat messages in that file. Make sure it is a WhatsApp "Export chat" file (.txt or .zip), a Telegram Desktop JSON export (result.json), an Instagram / Messenger JSON download (.zip or message_1.json), or a Discord data package (.zip, messages.json or messages.csv).'), true); return; }
     $('#picker').hidden = true;
     state.stats = S;
     state.unlocked = state.paidMarker;
@@ -817,19 +1159,28 @@
   }
   // v5: a Meta download can hold many chats. Let the person pick one (titles are shown only here, on the device).
   var PICKER_MAX = 40;
-  function showPicker(threads) {
-    var box = $('#picker'), list = $('#picker-list');
+  // v6: also used for Discord ("Which channels?"): items may carry their own open(), and opts sets the heading,
+  // the note and how many leading items (e.g. "All channels") don't count toward the limit.
+  var PICKER_DEFAULT = null;
+  function showPicker(threads, opts) {
+    opts = opts || {};
+    var box = $('#picker'), list = $('#picker-list'), h = $('#picker-h'), note = $('#picker-note'), extra = opts.extra || 0;
+    if (h && note) {
+      if (!PICKER_DEFAULT) PICKER_DEFAULT = { h: h.textContent, note: note.textContent };
+      h.textContent = opts.heading || PICKER_DEFAULT.h; note.textContent = opts.note || PICKER_DEFAULT.note;
+    }
     list.textContent = '';
-    threads.slice(0, PICKER_MAX).forEach(function (th) {
+    threads.slice(0, PICKER_MAX + extra).forEach(function (th) {
       var b = el('button', 'btn btn-ghost picker-item');
       b.type = 'button';
       b.appendChild(el('span', 'picker-title', th.title));
       b.appendChild(el('span', 'picker-count', th.count === 1 ? '1 message' : Math.round(th.count).toLocaleString('en-US') + ' messages'));
-      b.addEventListener('click', function () { openThread(th); });
+      b.addEventListener('click', function () { if (th.open) th.open(); else openThread(th); });
       list.appendChild(b);
     });
-    $('#picker-more').hidden = threads.length <= PICKER_MAX;
-    $('#picker-more').textContent = threads.length > PICKER_MAX ? 'Showing the ' + PICKER_MAX + ' biggest of ' + threads.length + ' chats.' : '';
+    var n = threads.length - extra, noun = opts.noun || 'chats';
+    $('#picker-more').hidden = n <= PICKER_MAX;
+    $('#picker-more').textContent = n > PICKER_MAX ? 'Showing the ' + PICKER_MAX + ' biggest of ' + n + ' ' + noun + '.' + (opts.moreNote || '') : '';
     box.hidden = false;
     setStatus('');
     box.scrollIntoView({ block: 'start' });
@@ -840,7 +1191,18 @@
     catch (err) { setStatus(err && err.friendly ? err.message : 'Could not read that chat.', true); return; }
     handleParsed(parsed, th.title);
   }
+  // v6: Discord data package: "All channels and DMs" first, then each channel, biggest first.
+  function openDiscord(pkg, id) { handleParsed(discordParsed(pkg.channels, id), null); }
+  function showDiscordPicker(pkg) {
+    if (pkg.channels.length === 1) return openDiscord(pkg, null);
+    var total = pkg.channels.reduce(function (n, c) { return n + c.count; }, 0);
+    var items = [{ title: 'All channels and DMs (your whole year)', count: total, open: function () { openDiscord(pkg, null); } }]
+      .concat(pkg.channels.map(function (c) { return { title: c.label, count: c.count, open: function () { openDiscord(pkg, c.id); } }; }));
+    showPicker(items, { extra: 1, noun: 'channels', moreNote: ' “All channels and DMs” still includes every one.', heading: 'Which channels?',
+      note: 'Your Discord data package has ' + plural(pkg.channels.length, 'channel') + ' and DMs with messages from you. Pick all of them for your whole year, or just one. It holds only messages you sent, so the recap is about you. This list is made on your device and isn’t saved.' });
+  }
   function handleImport(r, label) {
+    if (r.discord) return showDiscordPicker(r.discord);
     if (r.text != null) return handleText(r.text, label);
     if (r.threads.length === 1) return openThread(r.threads[0]);
     showPicker(r.threads);
@@ -858,43 +1220,155 @@
   function readBuf(file) {
     return new Promise(function (res, rej) { var r = new FileReader(); r.onerror = function () { rej(new Error('Could not read that file.')); }; r.onload = function () { res(r.result); }; r.readAsArrayBuffer(file); });
   }
-  function isZipBuf(buf, file) {
-    var b = new Uint8Array(buf, 0, Math.min(4, buf.byteLength));
+  function isZipHead(head, file) {
+    var b = new Uint8Array(head, 0, Math.min(4, head.byteLength));
     return (b.length === 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 3 && b[3] === 4) || /\.zip$/i.test(file.name) || /zip/i.test(file.type || ''); // "PK\3\4" = zip, whatever the name
   }
+  // v6: only the first 4 bytes are read to tell a zip apart. A zip is then read in pieces (see zipSource),
+  // never loaded whole; other files are small and read in full.
+  function sniffFile(file) { return readBuf(file.slice(0, 4)).then(function (head) { return isZipHead(head, file); }); }
+  function zipProgress(done, total) { if (total > 20 && (done % 10 === 0 || done === total)) setStatus('Reading your Discord messages on your device… ' + done + ' of ' + total + ' channels'); }
   function handleFile(file) {
     if (!file) return;
     setStatus('Reading on your device…');
     $('#picker').hidden = true;
-    readBuf(file).then(function (buf) {
-      if (isZipBuf(buf, file)) return readZipImport(buf).then(function (r) { handleImport(r, file.name); });
-      handleText(new TextDecoder().decode(buf), file.name);
+    sniffFile(file).then(function (zip) {
+      if (zip) return readZipImport(file, { onProgress: zipProgress }).then(function (r) { handleImport(r, file.name); });
+      return readBuf(file).then(function (buf) { handleText(new TextDecoder().decode(buf), file.name); });
     }).catch(function (err) { setStatus(err && err.message ? err.message : 'Could not read that file.', true); });
   }
   // v5: several files at once, e.g. message_1.json + message_2.json of one Instagram / Messenger chat.
+  // v6: or Discord's messages.json (or .csv) together with its channel.json and/or index.json.
   function handleFiles(list) {
     var files = Array.prototype.slice.call(list || []);
     if (files.length <= 1) return handleFile(files[0]);
     setStatus('Reading on your device…');
-    Promise.all(files.map(function (f) { return readBuf(f).then(function (b) { return { f: f, b: b }; }); })).then(function (all) {
-      if (all.some(function (x) { return isZipBuf(x.b, x.f); })) return handleFile(all.filter(function (x) { return isZipBuf(x.b, x.f); })[0].f);
-      var texts = all.map(function (x) { return new TextDecoder().decode(x.b); });
-      var sn = texts.map(sniffJson);
-      if (sn.every(function (j) { return j && j.format === 'meta'; })) {
-        var th = metaThreads(sn.map(function (j, i) { return { name: files[i].name, data: j.data }; }).map(function (x) { x.name = 'upload/' + x.name.replace(/^.*\//, ''); return x; }));
-        return openThread(th[0]);
-      }
-      setStatus('Please drop one chat file at a time (or, for Instagram / Messenger, the message_N.json files of one chat).', true);
+    Promise.all(files.map(function (f) { return sniffFile(f).then(function (z) { return { f: f, zip: z }; }); })).then(function (heads) {
+      var zips = heads.filter(function (x) { return x.zip; });
+      if (zips.length) return handleFile(zips[0].f);
+      return Promise.all(files.map(function (f) { return readBuf(f).then(function (b) { return new TextDecoder().decode(b); }); })).then(function (texts) {
+        var sn = texts.map(sniffJson);
+        if (sn.every(function (j) { return j && j.format === 'meta'; })) {
+          var th = metaThreads(sn.map(function (j, i) { return { name: files[i].name, data: j.data }; }).map(function (x) { x.name = 'upload/' + x.name.replace(/^.*\//, ''); return x; }));
+          return openThread(th[0]);
+        }
+        var rows = [], chs = [], idx = [];
+        texts.forEach(function (t, i) {
+          var j = sn[i];
+          if (j && j.format === 'discord') rows.push(t);
+          else if (!j && detectFormat(t) === 'discord') rows.push(t);
+          else if (j && j.format === 'discord-meta') (isDiscordIndexJson(j.data) ? idx : chs).push(j.data);
+          else rows.push(null);
+        });
+        if (rows.length === 1 && rows[0] !== null && chs.length <= 1 && idx.length <= 1) {
+          var parsed;
+          try { parsed = parseDiscord({ rows: rows[0], channel: chs[0] || null, index: idx[0] || null }); }
+          catch (err) { setStatus(err && err.friendly ? err.message : 'Could not read that file.', true); return; }
+          return handleParsed(parsed, null);
+        }
+        if (rows.filter(function (r) { return r !== null; }).length > 1 && rows.every(function (r) { return r !== null; })) {
+          setStatus('To combine several Discord channels, drop the whole data package .zip instead of separate messages files.', true); return;
+        }
+        setStatus('Please drop one chat file at a time (or, for Instagram / Messenger, the message_N.json files of one chat; for Discord, the data package .zip).', true);
+      });
     }).catch(function (err) { setStatus(err && err.message ? err.message : 'Could not read those files.', true); });
   }
 
   function slide(kind, title) { var s = el('section', 'slide slide-' + kind); s.setAttribute('aria-roledescription', 'slide'); var inner = el('div', 'slide-inner'); s.appendChild(inner); if (title) inner.appendChild(el('p', 'slide-kicker', title)); return { node: s, inner: inner }; }
   function big(parent, num, label) { var d = el('div', 'big'); d.appendChild(el('div', 'big-num', num)); if (label) d.appendChild(el('div', 'big-label', label)); parent.appendChild(d); }
 
+  // v6: the personal Discord deck. Same free/locked split (first 4 free) and the same lock, share and storage code.
+  function selfSlides(S) {
+    var slides = [], yr = S.usedYear ? String(S.year) : 'all time', name = S.groupName || 'Your year on Discord';
+    var top = (S.topChannels || [])[0];
+    var s1 = slide('intro', BRAND_NAME);
+    s1.inner.appendChild(el('h2', 'slide-title', name));
+    big(s1.inner, nf(S.total), 'messages you sent in ' + yr);
+    s1.inner.appendChild(el('p', 'slide-sub', placesText(S) + ' · ' + plural(S.activeDays, 'active day')));
+    s1.inner.appendChild(el('p', 'slide-note self-note', SELF_NOTE));
+    if (!S.usedYear) s1.inner.appendChild(el('p', 'slide-note', 'No ' + S.year + ' messages found, so this covers everything: ' + fmtDate(S.first) + ' to ' + fmtDate(S.last) + '.'));
+    else if (S.totalAll > S.total) s1.inner.appendChild(el('p', 'slide-note', 'Counting ' + S.year + ' only (' + nf(S.totalAll - S.total) + ' older messages left out).'));
+    slides.push(s1);
+
+    var s2 = slide('busy', 'When you posted');
+    big(s2.inner, fmtDate(S.busiestDay.t), 'your busiest day · ' + nf(S.busiestDay.count) + ' messages');
+    big(s2.inner, fmtHour(S.busiestHour.hour), 'your busiest hour');
+    big(s2.inner, S.busiestWeekday.day, 'your busiest weekday');
+    s2.inner.appendChild(el('p', 'slide-sub', 'About ' + (Math.round(S.perDay * 10) / 10) + ' messages a day'));
+    slides.push(s2);
+
+    var s3 = slide('talk', 'Where you talked');
+    s3.inner.appendChild(el('h2', 'slide-title', top ? top.label : name));
+    if (top) s3.inner.appendChild(el('p', 'slide-sub', nf(top.count) + ' messages · ' + Math.round(top.share * 100) + '% of yours'));
+    var bars = el('ul', 'bars');
+    (S.topChannels || []).forEach(function (c) {
+      var li = el('li'); var lab = el('span', 'bar-label', c.label); var track = el('span', 'bar-track'); var fill = el('span', 'bar-fill');
+      fill.style.width = Math.max(2, Math.round(c.share / top.share * 100)) + '%';
+      track.appendChild(fill); li.appendChild(lab); li.appendChild(track); li.appendChild(el('span', 'bar-val', Math.round(c.share * 100) + '%')); bars.appendChild(li);
+    });
+    if ((S.channelCount || 0) > 8) bars.appendChild(el('li', 'bar-more', '+ ' + (S.channelCount - 8) + ' more'));
+    s3.inner.appendChild(bars);
+    if (S.dmMsgs) s3.inner.appendChild(el('p', 'slide-sub', nf(S.dmMsgs) + ' of your messages were in DMs and group DMs'));
+    slides.push(s3);
+
+    var s4 = slide('streak', 'Your longest streak');
+    big(s4.inner, plural(S.streak.len, 'day'), 'in a row with at least one message from you');
+    s4.inner.appendChild(el('p', 'slide-sub', fmtDate(S.streak.start) + ' → ' + fmtDate(S.streak.end)));
+    slides.push(s4);
+
+    var s5 = slide('emoji', 'Your emoji of the year');
+    if (S.topEmojis.length) {
+      big(s5.inner, S.topEmojis[0].key, 'used ' + nf(S.topEmojis[0].count) + ' times');
+      if (S.topEmojis.length > 1) s5.inner.appendChild(el('p', 'slide-sub', 'Runners-up: ' + S.topEmojis.slice(1).map(function (e) { return e.key; }).join('  ')));
+    } else s5.inner.appendChild(el('p', 'slide-sub', 'A purely emoji-free year. Impressive restraint.'));
+    slides.push(s5);
+
+    var s6 = slide('word', 'Your word of the year');
+    if (S.topWords.length) {
+      big(s6.inner, '“' + S.topWords[0].key + '”', 'said ' + nf(S.topWords[0].count) + ' times');
+      s6.inner.appendChild(el('p', 'slide-sub', 'Runners-up: ' + S.topWords.slice(1).map(function (w) { return w.key; }).join(', ')));
+    } else s6.inner.appendChild(el('p', 'slide-sub', 'Not enough words to pick one.'));
+    slides.push(s6);
+
+    var s7 = slide('laugh', 'Laughs, links and files');
+    big(s7.inner, nf(S.laughs), 'laughs you sent (haha, lol, 😂, 🤣)');
+    big(s7.inner, nf(S.links || 0), 'links you shared');
+    big(s7.inner, nf(S.attachments || 0), 'messages with attachments');
+    slides.push(s7);
+
+    for (var i = 0; i < S.awards.length; i += 4) {
+      var sa = slide('awards', 'Your badges' + (S.awards.length > 4 ? ' (' + (i / 4 + 1) + '/' + Math.ceil(S.awards.length / 4) + ')' : ''));
+      var ula = el('ul', 'awards');
+      S.awards.slice(i, i + 4).forEach(function (a) {
+        var li = el('li'); li.appendChild(el('span', 'aw-emoji', a.emoji));
+        var tx = el('div'); tx.appendChild(el('strong', null, a.title)); tx.appendChild(el('span', 'aw-win', a.short || a.winner)); tx.appendChild(el('span', 'aw-line', a.line));
+        li.appendChild(tx); ula.appendChild(li);
+      });
+      sa.inner.appendChild(ula);
+      slides.push(sa);
+    }
+
+    var ss = slide('summary', 'Your ' + yr + ' in one slide');
+    ss.inner.appendChild(el('h2', 'slide-title', name));
+    var grid = el('dl', 'sum');
+    [['Messages', nf(S.total)], ['Top channel', top ? top.label : '—'], ['Busiest day', fmtDate(S.busiestDay.t)], ['Streak', plural(S.streak.len, 'day')], ['Emoji', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word', S.topWords[0] ? S.topWords[0].key : '—']].forEach(function (r) { grid.appendChild(el('dt', null, r[0])); grid.appendChild(el('dd', null, r[1])); });
+    ss.inner.appendChild(grid);
+    var ul2 = el('ul', 'sum-awards');
+    S.awards.slice(0, 6).forEach(function (a) { ul2.appendChild(el('li', null, a.emoji + ' ' + a.title + (a.short ? ': ' + a.short : ''))); });
+    ss.inner.appendChild(ul2);
+    ss.inner.appendChild(el('p', 'slide-foot', 'made at zexley.com · stats computed by code, badges for fun · only your own messages, from your Discord data package · not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify'));
+    slides.push(ss);
+    return slides;
+  }
+  // The share image never names a DM partner, even though this device's slides can.
+  function shareChannel(c) { return !c ? '—' : c.kind === 'dm' ? 'A direct message' : c.kind === 'group' ? 'A group DM' : c.label; }
+  api.shareChannel = shareChannel;
+
   function buildSlides(S) {
     var name = S.groupName || 'Your group chat';
-    var slides = [];
+    var slides = S.selfOnly ? selfSlides(S) : [];
     var yr = S.usedYear ? String(S.year) : 'all time';
+    if (!S.selfOnly) {
 
     var s1 = slide('intro', BRAND_NAME);
     s1.inner.appendChild(el('h2', 'slide-title', name));
@@ -970,8 +1444,9 @@
     var ul2 = el('ul', 'sum-awards');
     S.awards.slice(0, 6).forEach(function (a) { ul2.appendChild(el('li', null, a.emoji + ' ' + a.title + ': ' + a.winner)); });
     ss.inner.appendChild(ul2);
-    ss.inner.appendChild(el('p', 'slide-foot', 'made at zexley.com · stats computed by code, awards for fun · not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, or Spotify'));
+    ss.inner.appendChild(el('p', 'slide-foot', 'made at zexley.com · stats computed by code, awards for fun · not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify'));
     slides.push(ss);
+    }
 
     state.slides = slides;
     var track = $('#slides'); track.textContent = '';
@@ -981,7 +1456,7 @@
       if (k >= FREE_SLIDES) {
         s.node.classList.add('locked');
         var lock = el('div', 'lock');
-        lock.appendChild(el('p', 'lock-title', '🔒 ' + (slides.length - FREE_SLIDES) + ' more slides, including all ' + S.awards.length + ' awards'));
+        lock.appendChild(el('p', 'lock-title', '🔒 ' + (slides.length - FREE_SLIDES) + ' more slides, including all ' + S.awards.length + (S.selfOnly ? ' badges' : ' awards')));
         var b = el('button', 'btn unlock-btn', 'Unlock everything · ' + PRICE + ' one-time');
         b.type = 'button'; b.addEventListener('click', onUnlock);
         lock.appendChild(b);
@@ -1113,10 +1588,14 @@
     var serif = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif', sans = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
     x.textAlign = 'center'; x.fillStyle = '#d9a441'; x.font = '600 40px ' + sans;
     x.fillText(fitText(x, BRAND_NAME.toUpperCase(), 1000).split('').join(String.fromCharCode(8202)), 540, 140);
-    x.fillStyle = '#fffaf2'; x.font = '700 84px ' + serif; x.fillText(fitText(x, S.groupName || 'Our group chat', 960), 540, 250);
+    var self = !!S.selfOnly, top = self ? (S.topChannels || [])[0] : null;
+    // v6: a personal recap says "My year on Discord"; one server channel keeps its name; a DM is never named here.
+    var title = !self ? S.groupName : (S.channelCount === 1 && top && top.kind === 'server' ? top.label : 'My year on Discord');
+    x.fillStyle = '#fffaf2'; x.font = '700 84px ' + serif; x.fillText(fitText(x, title || (self ? 'My year on Discord' : 'Our group chat'), 960), 540, 250);
     x.font = '700 200px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(nf(S.total), 540, 470);
-    x.font = '400 44px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText('messages' + (S.usedYear ? ' in ' + S.year : ' (all time)'), 540, 535);
-    var rows = [['Top talker', S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Longest streak', plural(S.streak.len, 'day')], ['Emoji of the year', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word of the year', S.topWords[0] ? S.topWords[0].key : '—']];
+    x.font = '400 44px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText((self ? 'messages I sent' : 'messages') + (S.usedYear ? ' in ' + S.year : ' (all time)'), 540, 535);
+    if (self) { x.font = '400 28px ' + sans; x.fillStyle = '#b8ab92'; x.fillText('only my own messages, from my Discord data package', 540, 580); } // v6
+    var rows = [[self ? 'Top channel' : 'Top talker', self ? shareChannel(top) : S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Longest streak', plural(S.streak.len, 'day')], ['Emoji of the year', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word of the year', S.topWords[0] ? S.topWords[0].key : '—']];
     var y = 630; // v4: whole layout moved up to make room for the "Make yours" band + QR
     rows.forEach(function (r) { x.textAlign = 'left'; x.font = '400 40px ' + sans; x.fillStyle = '#d9a441'; x.fillText(r[0], 110, y); x.textAlign = 'right'; x.font = '700 46px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, r[1], 520), 970, y); y += 72; });
     y += 4; x.strokeStyle = 'rgba(217,164,65,0.5)'; x.lineWidth = 2; x.beginPath(); x.moveTo(110, y); x.lineTo(970, y); x.stroke(); y += 64;
@@ -1130,14 +1609,14 @@
       x.fillStyle = 'rgba(255,250,242,0.08)'; x.fill(); x.strokeStyle = 'rgba(217,164,65,0.45)'; x.lineWidth = 2; x.stroke();
       x.textAlign = 'center'; x.font = '72px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(a.emoji, L + 80, top + 96);
       x.textAlign = 'left'; x.font = '600 36px ' + sans; x.fillStyle = '#d9a441'; x.fillText(fitText(x, a.title, W - 200), L + 165, top + 48);
-      x.font = '700 48px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, locked ? '? ? ?' : a.winner, W - 200), L + 165, top + 100);
-      var sub = locked ? 'Who won? Unlock the full recap to find out.' : (/^(.+?[.!?])(\s|$)/.exec(a.line) || [a.line, a.line])[1]; // first sentence only
+      x.font = '700 48px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, locked ? '? ? ?' : (self && a.short ? a.short : a.winner), W - 200), L + 165, top + 100);
+      var sub = locked ? (self ? 'Unlock the full recap to see this badge.' : 'Who won? Unlock the full recap to find out.') : (/^(.+?[.!?])(\s|$)/.exec(a.line) || [a.line, a.line])[1]; // first sentence only
       x.font = '400 28px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText(fitText(x, sub, W - 200), L + 165, top + 130);
       x.textAlign = 'center';
     }
     if (feat.length) {
       x.font = '700 50px ' + serif; x.fillStyle = '#d9a441';
-      x.fillText(state.unlocked ? 'Top awards' + (S.awards.length > feat.length ? ' (' + feat.length + ' of ' + S.awards.length + ')' : '') : S.awards.length + ' group awards inside 🏆', 540, y);
+      x.fillText(state.unlocked ? (self ? 'My top badges' : 'Top awards') + (S.awards.length > feat.length ? ' (' + feat.length + ' of ' + S.awards.length + ')' : '') : S.awards.length + (self ? ' personal badges inside 🏆' : ' group awards inside 🏆'), 540, y);
       y += 30;
       feat.forEach(function (a) { card(y, a, !state.unlocked); y += 156; });
     } else {
@@ -1155,7 +1634,7 @@
     x.fillText('made at zexley.com/wrapped · stats computed by code, awards for fun', 540, 1838);
     x.font = '400 26px ' + sans; x.fillStyle = '#b8ab92';
     x.fillText('AI-assisted product by Zexley · no AI reads your chat', 540, 1872);
-    var naf = 'Not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, or Spotify', nfs = 26;
+    var naf = 'Not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify', nfs = 26;
     while (nfs > 18 && x.measureText(naf).width > 1000) { nfs--; x.font = '400 ' + nfs + 'px ' + sans; } // v5: longer list, keep it on the canvas
     x.fillText(naf, 540, 1904);
     return c;

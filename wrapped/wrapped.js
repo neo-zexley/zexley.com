@@ -22,6 +22,13 @@
   // PROTOTYPE_PREVIEW: lets a reviewer see the locked slides. MUST be false at launch.
   var PROTOTYPE_PREVIEW = false;
   var PRICE = '$4.99';
+  // v7 (Nov 23, 2026): "Two of Us", the 1-on-1 recap for chats where exactly two people sent messages.
+  // PAIR_PAYMENT_LINK: the $2.99 Stripe Payment Link. Its after-payment redirect must be
+  //   https://zexley.com/wrapped/?unlocked=1&plan=pair
+  // While it is a placeholder, the 1-on-1 unlock button shows "Payment not connected".
+  var PAIR_PAYMENT_LINK = 'https://buy.stripe.com/4gM7sL0hZdzTfDQ38Ggbm03';
+  var PAIR_PRICE = '$2.99';
+  var PAIR_BRAND = 'Two of Us Wrapped 2026';
   var FREE_SLIDES = 4;
   var TARGET_YEAR = 2026;
   // BRAND_NAME: the one place the product name lives. Used for the page title, headings,
@@ -589,6 +596,8 @@
   var LAUGH_RE = /\b(?:a?(?:ha){2,}h?|(?:he){2,}|lo+l+|lmf?ao+|rofl|(?:ja){2,}j?|mdr)\b|😂|🤣|😆|😹/gi; // v5: + "jajaja" (es), "mdr" (fr)
   var OK_RE = /^(k+|kk+|ok+|okay|okie|okey|oki)[.!]?$/i;
   var LINK_RE = /(?:\bhttps?:\/\/|\bwww\.)\S+/i; // counted only; links are never shown or stored
+  var GN_RE = /\b(?:good ?night|nighty? ?night|night night|sweet dreams|sleep well|gn)\b/i; // v7, English only
+  var GM_RE = /\b(?:good ?morning|morning!|gm)\b/i; // v7, English only
   var HEART_RE = /❤|🥰|😍|😘|💕|💖|💗|💛|💙|💚|💜|🤗|\blove\b|\blove you\b/gi;
   var DAYNAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -620,7 +629,8 @@
     function P(name) {
       return people[name] || (people[name] = { name: name, count: 0, words: 0, chars: 0, emojis: {}, emojiCount: 0, media: 0, sticker: 0, deleted: 0, laughs: 0, ok: 0, night: 0, early: 0, starts: 0, gaps: [], longest: null, questions: 0, exclaims: 0, hearts: 0,
         links: 0, weekend: 0, lunch: 0, closes: 0, days: {}, // v3: links, weekend, lunch, closes, days
-        blank: 0, attText: 0, mentions: 0, bursts: 0 }); // v6 (Discord): no-text messages, text + attachment, @-mentions, quick follow-ups
+        blank: 0, attText: 0, mentions: 0, bursts: 0, // v6 (Discord): no-text messages, text + attachment, @-mentions, quick follow-ups
+        gnight: 0, gmorn: 0 }); // v7 (Two of Us): good night / good morning messages (English only; counted, text never kept)
     }
     var chCount = {}; // v6: messages per Discord channel (personal recap)
     var prev = null;
@@ -659,6 +669,8 @@
       if (LINK_RE.test(tx)) p.links++;
       var lm = tx.match(LAUGH_RE); if (lm) p.laughs += lm.length;
       var hm = tx.match(HEART_RE); if (hm) p.hearts += hm.length;
+      if (GN_RE.test(tx)) p.gnight++; // v7
+      if (GM_RE.test(tx)) p.gmorn++;  // v7
       var em = tx.match(EMOJI_RE);
       if (em) em.forEach(function (e) { e = emojiKey(e); p.emojis[e] = (p.emojis[e] || 0) + 1; emojis[e] = (emojis[e] || 0) + 1; p.emojiCount++; });
       var toks = tx.replace(/(?:\bhttps?:\/\/|\bwww\.)\S+/gi, ' ').toLowerCase().match(/[\p{L}\p{N}']+/gu) || [];
@@ -692,8 +704,47 @@
     S.media = list.reduce(function (s, p) { return s + p.media + p.sticker; }, 0);
     if (parsed.selfOnly) selfStats(S, list[0], chCount, parsed.channels || {}, msgs.length);
     else S.awards = assignAwards(list);
+    if (!parsed.selfOnly && list.length === 2) { S.pair = pairStats(list); pairWording(S.awards); } // v7: exactly two people sent messages
     return S;
   }
+  // v7: the extra numbers for a 1-on-1 ("Two of Us") recap. Counts and one typical reply time each; no text.
+  // Typical reply = the median gap before a reply from this person, counting only replies within 12 hours,
+  // and only when there are at least 5 of them (otherwise null).
+  function pairStats(list) {
+    var a = list[0], b = list[1];
+    function two(f) { return [f(a), f(b)]; }
+    var starts = two(function (p) { return p.starts; });
+    return {
+      names: two(function (p) { return p.name; }),
+      counts: two(function (p) { return p.count; }),
+      starts: starts,
+      startTotal: starts[0] + starts[1],
+      reply: two(function (p) { return isFinite(p.medianGap) ? Math.round(p.medianGap) : null; }),
+      hearts: two(function (p) { return p.hearts; }),
+      laughs: two(function (p) { return p.laughs; }),
+      questions: two(function (p) { return p.questions; }),
+      goodnights: a.gnight + b.gnight,
+      goodmornings: a.gmorn + b.gmorn
+    };
+  }
+  // v7: same awards and numbers, worded for two people instead of a family or group.
+  var PAIR_WORDS = [["Family Photographer", "Chief Photographer"], ["The group\'s personal librarian.", "Your personal librarian."], ["The group's personal librarian.", "Your personal librarian."], ["Curiosity keeps a family close.", "Curiosity keeps you two close."], ["The chat's sunrise.", "The morning person."]];
+  function pairWording(awards) {
+    (awards || []).forEach(function (a) { PAIR_WORDS.forEach(function (w) { a.title = a.title.split(w[0]).join(w[1]); a.line = a.line.split(w[0]).join(w[1]); }); });
+  }
+  function firstTexter(P) {
+    if (!P || !P.startTotal) return '—';
+    if (P.starts[0] === P.starts[1]) return 'A perfect tie';
+    return P.names[P.starts[0] > P.starts[1] ? 0 : 1];
+  }
+  function isPair(S) { return !!(S && S.pair && !S.selfOnly); }
+  // Which unlock a recap needs: 'pair' ($2.99) for a 1-on-1 recap, otherwise 'group' ($4.99).
+  function planFor(S) { return isPair(S) ? 'pair' : 'group'; }
+  // A group unlock covers any recap; a 1-on-1 unlock covers only 1-on-1 recaps. Older records have no plan (= group).
+  function covers(plan, S) { return plan !== 'pair' || isPair(S); }
+  function priceFor(S) { return isPair(S) ? PAIR_PRICE : PRICE; }
+  function linkFor(S) { return isPair(S) ? PAIR_PAYMENT_LINK : PAYMENT_LINK; }
+  function brandFor(S) { return isPair(S) ? PAIR_BRAND : BRAND_NAME; }
 
   // ---------- Awards (kind, never about appearance or identity) ----------
   var AWARDS = [
@@ -925,7 +976,7 @@
 
   // ---------- Unlock-return storage (computed stats only, never chat text) ----------
   function slugify(s) { return String(s).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'recap'; }
-  function shareFilename() { return slugify(BRAND_NAME) + '.png'; }
+  function shareFilename(S) { return slugify(S ? brandFor(S) : BRAND_NAME) + '.png'; }
   function pick(o, keys) { var r = {}; keys.forEach(function (k) { if (o && o[k] !== undefined) r[k] = o[k]; }); return r; }
   // Whitelist of what may be stored on the device. Deliberately leaves out per-person
   // working data (longest message text, reply gaps, emoji maps) so no message text is kept.
@@ -943,6 +994,7 @@
     o.topEmojis = (S.topEmojis || []).map(function (e) { return { key: e.key, count: e.count }; });
     o.topWords = (S.topWords || []).map(function (e) { return { key: e.key, count: e.count }; });
     o.awards = (S.awards || []).map(function (a) { return pick(a, ['id', 'emoji', 'title', 'winner', 'short', 'line']); });
+    if (S.pair) o.pair = pick(S.pair, ['names', 'counts', 'starts', 'startTotal', 'reply', 'hearts', 'laughs', 'questions', 'goodnights', 'goodmornings']); // v7: counts only
     return o;
   }
   function randomRef() {
@@ -955,6 +1007,7 @@
   function saveRecord(storage, S, opts) {
     opts = opts || {}; var now = opts.now || Date.now();
     var rec = { v: 1, ref: opts.ref || randomRef(), savedAt: now, expiresAt: now + (opts.paid ? PAID_TTL_MS : PENDING_TTL_MS), paid: !!opts.paid, stats: S ? toStoredStats(S) : null };
+    if (opts.plan === 'pair') rec.paidPlan = 'pair'; // v7: an "unlocked" marker from a $2.99 return
     try { storage.setItem(STORE_KEY, JSON.stringify(rec)); return rec; } catch (e) { return null; }
   }
   function loadRecord(storage, now) {
@@ -971,20 +1024,21 @@
   // Rejects unlocked!=1, a missing flag, and an unsubstituted {CHECKOUT_SESSION_ID}.
   function parseReturn(search) {
     var q = {}; String(search || '').replace(/^\?/, '').split('&').forEach(function (kv) { if (!kv) return; var i = kv.indexOf('='); var k = i < 0 ? kv : kv.slice(0, i); var v = i < 0 ? '' : kv.slice(i + 1); try { q[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, ' ')); } catch (e) { /* ignore */ } });
-    if (q.unlocked === '1') return { paid: true };
+    if (q.unlocked === '1') return q.plan === 'pair' ? { paid: true, plan: 'pair' } : { paid: true }; // v7: &plan=pair = the $2.99 link
     if (q.unlocked !== undefined) return { paid: false };
     if (q.paid !== '1') return null;
     var sid = q.session_id || '';
     return { paid: /^cs_(test|live)_[A-Za-z0-9_]{6,200}$/.test(sid), sessionId: sid };
   }
   // Turns the saved record after a paid return: unlocked, kept PAID_TTL_MS from now.
-  function markPaid(storage, rec, now) {
+  function markPaid(storage, rec, now, plan) {
     now = now || Date.now();
     rec.paid = true; rec.expiresAt = now + PAID_TTL_MS; rec.paidAt = now;
+    if (plan === 'pair') rec.paidPlan = 'pair'; else delete rec.paidPlan; // v7
     try { storage.setItem(STORE_KEY, JSON.stringify(rec)); } catch (e) { /* ignore */ }
     return rec;
   }
-  function paymentUrl(ref) { return PAYMENT_LINK + (PAYMENT_LINK.indexOf('?') >= 0 ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(ref); }
+  function paymentUrl(ref, link) { link = link || PAYMENT_LINK; return link + (link.indexOf('?') >= 0 ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(ref); }
 
   // ---------- QR code (v4): tiny on-device encoder, written for Zexley ----------
   // Original code (no third-party code vendored): byte mode, error correction level M,
@@ -1119,7 +1173,7 @@
     return Promise.resolve(p).then(function () { return 'shared'; }, function (err) { if (err && err.name === 'AbortError') return 'cancelled'; fallback(); return 'downloaded'; });
   }
 
-  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, readZipImport: readZipImport, parseMeta: parseMeta, fixMojibake: fixMojibake, isMetaJson: isMetaJson, metaThreads: metaThreads, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl, qrEncode: qrEncode, drawQR: drawQR, QR_URL: QR_URL, shareFile: shareFile, canShareFiles: canShareFiles, shareImage: shareImage, SHARE_CTA: SHARE_CTA,
+  var api = { parseChat: parseChat, parseTelegram: parseTelegram, flattenTgText: flattenTgText, detectFormat: detectFormat, parseAny: parseAny, computeStats: computeStats, assignAwards: assignAwards, readZipChat: readZipChat, readZipImport: readZipImport, parseMeta: parseMeta, fixMojibake: fixMojibake, isMetaJson: isMetaJson, metaThreads: metaThreads, inferDateOrder: inferDateOrder, AWARDS: AWARDS, MAX_AWARDS: MAX_AWARDS, plural: plural, featuredAwards: featuredAwards, fmtDate: fmtDate, fmtHour: fmtHour, PAYMENT_LINK: PAYMENT_LINK, PROTOTYPE_PREVIEW: PROTOTYPE_PREVIEW, PAIR_PAYMENT_LINK: PAIR_PAYMENT_LINK, PAIR_PRICE: PAIR_PRICE, PRICE: PRICE, PAIR_BRAND: PAIR_BRAND, pairStats: pairStats, isPair: isPair, planFor: planFor, covers: covers, priceFor: priceFor, linkFor: linkFor, brandFor: brandFor, firstTexter: firstTexter, BRAND_NAME: BRAND_NAME, STORE_KEY: STORE_KEY, PENDING_TTL_MS: PENDING_TTL_MS, PAID_TTL_MS: PAID_TTL_MS, slugify: slugify, shareFilename: shareFilename, toStoredStats: toStoredStats, saveRecord: saveRecord, loadRecord: loadRecord, forgetRecord: forgetRecord, markPaid: markPaid, parseReturn: parseReturn, paymentUrl: paymentUrl, qrEncode: qrEncode, drawQR: drawQR, QR_URL: QR_URL, shareFile: shareFile, canShareFiles: canShareFiles, shareImage: shareImage, SHARE_CTA: SHARE_CTA,
     // v6 (Discord)
     parseDiscord: parseDiscord, parseDce: parseDce, parseCsv: parseCsv, discordCsvRows: discordCsvRows, snowflakeMs: snowflakeMs, discordTsMs: discordTsMs, discordText: discordText,
     discordParsed: discordParsed, discordChannelInfo: discordChannelInfo, isDiscordRows: isDiscordRows, isDceJson: isDceJson, sniffJson: sniffJson, SELF_AWARDS: SELF_AWARDS, assignSelfAwards: assignSelfAwards, placesText: placesText };
@@ -1128,7 +1182,7 @@
 
   // ===================== Browser UI =====================
   var doc = root.document;
-  var state = { stats: null, slides: [], idx: 0, unlocked: false, paidMarker: false };
+  var state = { stats: null, slides: [], idx: 0, unlocked: false, paidMarker: false, paidPlan: null };
   var SELF_NOTE = 'Only your own messages: Discord’s data package doesn’t include anyone else’s.';
   function $(s) { return doc.querySelector(s); }
   function el(tag, cls, text) { var e = doc.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -1154,7 +1208,7 @@
     if (S.empty) { setStatus((parsed.format === 'discord' ? 'We could not find any messages from you in that Discord file. Make sure your data request included Messages, then drop the whole data package .zip (or a messages.json from inside its Messages folder).' : parsed.format === 'dce' ? 'We could not find any messages in that file.' : parsed.format === 'telegram' ? 'We could not find any messages in that Telegram export. Make sure it is a group or chat export from Telegram Desktop in the "Machine-readable JSON" format.' : parsed.format === 'meta' ? 'We could not find any messages in that Instagram or Messenger chat. Make sure your download includes Messages and covers the dates you want.' : 'We could not find any chat messages in that file. Make sure it is a WhatsApp "Export chat" file (.txt or .zip), a Telegram Desktop JSON export (result.json), an Instagram / Messenger JSON download (.zip or message_1.json), or a Discord data package (.zip, messages.json or messages.csv).'), true); return; }
     $('#picker').hidden = true;
     state.stats = S;
-    state.unlocked = state.paidMarker;
+    state.unlocked = state.paidMarker && covers(state.paidPlan, S);
     showDeck(S);
   }
   // v5: a Meta download can hold many chats. Let the person pick one (titles are shown only here, on the device).
@@ -1360,15 +1414,112 @@
     slides.push(ss);
     return slides;
   }
+  // ---------- v7: "Two of Us", the 1-on-1 deck (exactly two people sent messages) ----------
+  // Same free/locked split (first 4 free), lock, share and storage code. Kind, count-based, no message text.
+  function pct(n, d) { return d ? Math.round(n / d * 100) : 0; }
+  function pairBars(parent, P, vals) {
+    var tot = vals[0] + vals[1], mx = Math.max(vals[0], vals[1]) || 1, bars = el('ul', 'bars');
+    [0, 1].forEach(function (i) {
+      var li = el('li'); var lab = el('span', 'bar-label', P.names[i]); var track = el('span', 'bar-track'); var fill = el('span', 'bar-fill');
+      fill.style.width = Math.max(2, Math.round(vals[i] / mx * 100)) + '%';
+      track.appendChild(fill); li.appendChild(lab); li.appendChild(track); li.appendChild(el('span', 'bar-val', pct(vals[i], tot) + '%')); bars.appendChild(li);
+    });
+    parent.appendChild(bars);
+  }
+  function pairSlides(S) {
+    var P = S.pair, slides = [], yr = S.usedYear ? String(S.year) : 'all time', duo = P.names.join(' & ');
+    var s1 = slide('intro', PAIR_BRAND);
+    s1.inner.appendChild(el('h2', 'slide-title', duo));
+    big(s1.inner, nf(S.total), 'messages between you in ' + yr);
+    s1.inner.appendChild(el('p', 'slide-sub', plural(S.activeDays, 'day') + ' you talked · about ' + (Math.round(S.perDay * 10) / 10) + ' messages a day'));
+    if (!S.usedYear) s1.inner.appendChild(el('p', 'slide-note', 'No ' + S.year + ' messages found, so this covers everything: ' + fmtDate(S.first) + ' to ' + fmtDate(S.last) + '.'));
+    else if (S.totalAll > S.total) s1.inner.appendChild(el('p', 'slide-note', 'Counting ' + S.year + ' only (' + nf(S.totalAll - S.total) + ' older messages left out).'));
+    slides.push(s1);
+
+    var s2 = slide('busy', 'When you two talked');
+    big(s2.inner, fmtDate(S.busiestDay.t), 'your busiest day · ' + nf(S.busiestDay.count) + ' messages');
+    big(s2.inner, fmtHour(S.busiestHour.hour), 'your busiest hour');
+    big(s2.inner, S.busiestWeekday.day, 'your busiest weekday');
+    slides.push(s2);
+
+    var s3 = slide('talk', 'Who texts first');
+    var ft = firstTexter(P);
+    s3.inner.appendChild(el('h2', 'slide-title', ft));
+    if (P.startTotal && P.starts[0] !== P.starts[1]) {
+      var w = P.starts[0] > P.starts[1] ? 0 : 1;
+      s3.inner.appendChild(el('p', 'slide-sub', 'started ' + pct(P.starts[w], P.startTotal) + '% of your conversations (' + nf(P.starts[w]) + ' of ' + nf(P.startTotal) + ')'));
+    } else if (P.startTotal) s3.inner.appendChild(el('p', 'slide-sub', 'You each started ' + nf(P.starts[0]) + ' conversations.'));
+    pairBars(s3.inner, P, P.starts);
+    s3.inner.appendChild(el('p', 'slide-note', 'A conversation starts with the first message after 6+ quiet hours. Messages overall: ' + P.names[0] + ' ' + pct(P.counts[0], S.total) + '% · ' + P.names[1] + ' ' + pct(P.counts[1], S.total) + '%.'));
+    slides.push(s3);
+
+    var s4 = slide('streak', 'Your longest streak');
+    big(s4.inner, plural(S.streak.len, 'day'), 'in a row that you talked');
+    s4.inner.appendChild(el('p', 'slide-sub', fmtDate(S.streak.start) + ' → ' + fmtDate(S.streak.end)));
+    slides.push(s4);
+
+    var s5 = slide('reply', 'Reply speed');
+    [0, 1].forEach(function (i) {
+      big(s5.inner, P.reply[i] != null ? fmtGap(P.reply[i]) : '—', P.names[i] + (P.reply[i] != null ? '’s typical reply' : ': not enough quick replies to tell'));
+    });
+    s5.inner.appendChild(el('p', 'slide-note', 'Typical = the middle value of replies sent within 12 hours. Just for fun: life gets busy.'));
+    slides.push(s5);
+
+    var s6 = slide('emoji', 'Your emoji');
+    if (S.topEmojis.length) {
+      big(s6.inner, S.topEmojis[0].key, 'your shared favorite · used ' + nf(S.topEmojis[0].count) + ' times');
+      var ul = el('ul', 'mini');
+      S.people.slice(0, 2).forEach(function (p) { if (p.topEmoji) ul.appendChild(el('li', null, p.name + ': ' + p.topEmoji.key)); });
+      s6.inner.appendChild(ul);
+    } else s6.inner.appendChild(el('p', 'slide-sub', 'A purely emoji-free year. Impressive restraint.'));
+    slides.push(s6);
+
+    var s7 = slide('word', 'Your word of the year');
+    if (S.topWords.length) {
+      big(s7.inner, '“' + S.topWords[0].key + '”', 'said ' + nf(S.topWords[0].count) + ' times between you');
+      s7.inner.appendChild(el('p', 'slide-sub', 'Runners-up: ' + S.topWords.slice(1).map(function (w) { return w.key; }).join(', ')));
+    } else s7.inner.appendChild(el('p', 'slide-sub', 'Not enough words to pick one.'));
+    slides.push(s7);
+
+    var s8 = slide('laugh', 'Hearts and laughs');
+    big(s8.inner, nf(P.hearts[0] + P.hearts[1]), 'hearts and “love you”s');
+    big(s8.inner, nf(P.laughs[0] + P.laughs[1]), 'laughs (haha, lol, 😂, 🤣)');
+    if (P.goodnights || P.goodmornings) s8.inner.appendChild(el('p', 'slide-sub', nf(P.goodmornings) + ' good mornings · ' + nf(P.goodnights) + ' good nights'));
+    slides.push(s8);
+
+    for (var i = 0; i < S.awards.length; i += 4) {
+      var sa = slide('awards', 'Your awards' + (S.awards.length > 4 ? ' (' + (i / 4 + 1) + '/' + Math.ceil(S.awards.length / 4) + ')' : ''));
+      var ula = el('ul', 'awards');
+      S.awards.slice(i, i + 4).forEach(function (a) {
+        var li = el('li'); li.appendChild(el('span', 'aw-emoji', a.emoji));
+        var tx = el('div'); tx.appendChild(el('strong', null, a.title)); tx.appendChild(el('span', 'aw-win', a.winner)); tx.appendChild(el('span', 'aw-line', a.line));
+        li.appendChild(tx); ula.appendChild(li);
+      });
+      sa.inner.appendChild(ula);
+      slides.push(sa);
+    }
+
+    var ss = slide('summary', 'Your ' + yr + ' in one slide');
+    ss.inner.appendChild(el('h2', 'slide-title', duo));
+    var grid = el('dl', 'sum');
+    [['Messages', nf(S.total)], ['First to text', ft], ['Busiest day', fmtDate(S.busiestDay.t)], ['Streak', plural(S.streak.len, 'day')], ['Emoji', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word', S.topWords[0] ? S.topWords[0].key : '—']].forEach(function (r) { grid.appendChild(el('dt', null, r[0])); grid.appendChild(el('dd', null, r[1])); });
+    ss.inner.appendChild(grid);
+    var ul2 = el('ul', 'sum-awards');
+    S.awards.slice(0, 6).forEach(function (a) { ul2.appendChild(el('li', null, a.emoji + ' ' + a.title + ': ' + a.winner)); });
+    ss.inner.appendChild(ul2);
+    ss.inner.appendChild(el('p', 'slide-foot', 'made at zexley.com · a 1-on-1 recap · stats computed by code, awards for fun · not affiliated with Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify'));
+    slides.push(ss);
+    return slides;
+  }
   // The share image never names a DM partner, even though this device's slides can.
   function shareChannel(c) { return !c ? '—' : c.kind === 'dm' ? 'A direct message' : c.kind === 'group' ? 'A group DM' : c.label; }
   api.shareChannel = shareChannel;
 
   function buildSlides(S) {
     var name = S.groupName || 'Your group chat';
-    var slides = S.selfOnly ? selfSlides(S) : [];
+    var slides = S.selfOnly ? selfSlides(S) : isPair(S) ? pairSlides(S) : [];
     var yr = S.usedYear ? String(S.year) : 'all time';
-    if (!S.selfOnly) {
+    if (!S.selfOnly && !isPair(S)) {
 
     var s1 = slide('intro', BRAND_NAME);
     s1.inner.appendChild(el('h2', 'slide-title', name));
@@ -1457,11 +1608,11 @@
         s.node.classList.add('locked');
         var lock = el('div', 'lock');
         lock.appendChild(el('p', 'lock-title', '🔒 ' + (slides.length - FREE_SLIDES) + ' more slides, including all ' + S.awards.length + (S.selfOnly ? ' badges' : ' awards')));
-        var b = el('button', 'btn unlock-btn', 'Unlock everything · ' + PRICE + ' one-time');
+        var b = el('button', 'btn unlock-btn', 'Unlock everything · ' + priceFor(S) + ' one-time');
         b.type = 'button'; b.addEventListener('click', onUnlock);
         lock.appendChild(b);
         var note = el('p', 'lock-note');
-        note.appendChild(doc.createTextNode('If the unlock doesn’t work or you’re unhappy, email neo@zexley.com within 14 days of purchase and we’ll refund the $4.99. You don’t need to send us your chat. By paying, you agree to the '));
+        note.appendChild(doc.createTextNode('If the unlock doesn’t work or you’re unhappy, email neo@zexley.com within 14 days of purchase and we’ll refund the ' + priceFor(S) + '. You don’t need to send us your chat. By paying, you agree to the '));
         var ta = el('a', null, 'Terms');
         ta.href = '../terms.html';
         note.appendChild(ta);
@@ -1497,8 +1648,8 @@
   function store() { try { return root.localStorage; } catch (e) { return null; } }
 
   function onUnlock() {
-    var note = $('#paynote');
-    if (PAYMENT_LINK.indexOf('PLACEHOLDER') >= 0) {
+    var note = $('#paynote'), link = linkFor(state.stats);
+    if (link.indexOf('PLACEHOLDER') >= 0) {
       note.hidden = false;
       note.querySelector('.pay-msg').textContent = 'Payment not connected in this prototype. Nothing was charged.';
       $('#preview-unlock').hidden = !PROTOTYPE_PREVIEW;
@@ -1509,9 +1660,9 @@
     // device, then go to the Stripe Payment Link in this tab. Stripe redirects back to
     // ?unlocked=1 and init() restores the deck unlocked.
     var rec = store() && saveRecord(store(), state.stats);
-    if (rec) { root.location.assign(paymentUrl(rec.ref)); return; }
+    if (rec) { root.location.assign(paymentUrl(rec.ref, link)); return; }
     // Storage blocked (some private modes): keep this tab's deck and pay in a new tab.
-    root.open(PAYMENT_LINK, '_blank', 'noopener');
+    root.open(link, '_blank', 'noopener');
     note.hidden = false;
     note.querySelector('.pay-msg').textContent = 'Checkout opened in a new tab. Your browser blocks on-device storage, so keep this tab open and come back to it after paying.';
   }
@@ -1520,14 +1671,14 @@
   function simulateReturn() {
     var rec = store() && saveRecord(store(), state.stats);
     if (!rec) { setStatus('This browser blocks on-device storage, so the return cannot be simulated.', true); return; }
-    root.location.assign(root.location.pathname + '?unlocked=1');
+    root.location.assign(root.location.pathname + '?unlocked=1' + (isPair(state.stats) ? '&plan=pair' : ''));
   }
 
   function fmtClock(t) { var d = new Date(t); return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
 
   function forgetNow() {
     var s = store(); if (s) forgetRecord(s);
-    state.paidMarker = false;
+    state.paidMarker = false; state.paidPlan = null;
     reset();
     $('#saved').hidden = true;
     setStatus('Forgotten. Nothing from your recap is stored on this device.');
@@ -1536,8 +1687,8 @@
   function showSaved(rec) {
     var box = $('#saved'); box.hidden = false;
     box.querySelector('.saved-msg').textContent = rec.stats
-      ? (rec.paid ? 'Your unlocked recap' : 'Your recap') + (rec.stats.groupName ? ' for “' + rec.stats.groupName + '”' : '') + ' is saved on this device until ' + fmtClock(rec.expiresAt) + '. Only the stats are saved, never your messages.'
-      : 'Your unlock is remembered on this device until ' + fmtClock(rec.expiresAt) + '. Load your chat and it opens fully unlocked. No chat data is saved.';
+      ? (rec.paid ? 'Your unlocked recap' : 'Your recap') + (rec.stats.pair ? ' for ' + rec.stats.pair.names.join(' & ') : rec.stats.groupName ? ' for “' + rec.stats.groupName + '”' : '') + ' is saved on this device until ' + fmtClock(rec.expiresAt) + '. Only the stats are saved, never your messages.'
+      : 'Your unlock is remembered on this device until ' + fmtClock(rec.expiresAt) + '. Load your ' + (rec.paidPlan === 'pair' ? '1-on-1 ' : '') + 'chat and it opens fully unlocked. No chat data is saved.';
     scheduleExpiry(rec);
     $('#saved-open').hidden = !rec.stats;
   }
@@ -1552,7 +1703,7 @@
 
   function restore(rec) {
     scheduleExpiry(rec);
-    state.stats = rec.stats; state.unlocked = !!rec.paid;
+    state.stats = rec.stats; state.unlocked = !!rec.paid && covers(rec.paidPlan, rec.stats);
     showDeck(rec.stats);
   }
 
@@ -1564,16 +1715,21 @@
       if (!ret.paid) { setStatus('That payment link looks incomplete, so nothing was unlocked. If you paid, email neo@zexley.com.', true); }
       else {
         var rec = s && loadRecord(s);
-        if (rec) { markPaid(s, rec); if (rec.stats) { $('#deck-msg').hidden = false; $('#deck-msg').textContent = 'Thanks! Your full recap is unlocked. It is kept on this device until ' + fmtClock(rec.expiresAt) + ', or press “Forget my recap now”.'; restore(rec); return; } }
+        if (rec && rec.stats && !covers(ret.plan, rec.stats)) {
+          // v7: a $2.99 (1-on-1) return, but the saved recap is a group chat. Don't unlock it; don't hide the problem.
+          setStatus('Thanks for paying! That checkout was the $2.99 one for 1-on-1 chats, but your saved recap is a group chat, so it stays locked. Email neo@zexley.com and we’ll sort it out or refund you.', true);
+          showSaved(rec); return;
+        }
+        if (rec) { markPaid(s, rec, null, ret.plan); state.paidMarker = true; state.paidPlan = rec.paidPlan || null; if (rec.stats) { $('#deck-msg').hidden = false; $('#deck-msg').textContent = 'Thanks! Your full recap is unlocked. It is kept on this device until ' + fmtClock(rec.expiresAt) + ', or press “Forget my recap now”.'; restore(rec); return; } }
         // Paid, but the saved stats are gone (expired, other browser, storage blocked).
-        var marker = s && saveRecord(s, null, { paid: true }); if (marker) scheduleExpiry(marker);
-        state.paidMarker = true;
-        setStatus('Thanks for paying! Your saved recap is no longer on this device. Load your chat again and it will open fully unlocked.');
+        var marker = s && saveRecord(s, null, { paid: true, plan: ret.plan }); if (marker) scheduleExpiry(marker);
+        state.paidMarker = true; state.paidPlan = ret.plan === 'pair' ? 'pair' : null;
+        setStatus(ret.plan === 'pair' ? 'Thanks for paying! Your saved recap is no longer on this device. Load your 1-on-1 chat again and it will open fully unlocked.' : 'Thanks for paying! Your saved recap is no longer on this device. Load your chat again and it will open fully unlocked.');
         return;
       }
     }
     var saved = s && loadRecord(s);
-    if (saved) { state.paidMarker = !!saved.paid; showSaved(saved); }
+    if (saved) { state.paidMarker = !!saved.paid; state.paidPlan = saved.paidPlan || null; showSaved(saved); }
   }
 
   // ---------- Share image (1080x1920 PNG, drawn on the device) ----------
@@ -1587,15 +1743,15 @@
     for (var i = 0; i < 70; i++) { var px = (i * 397) % 1080, py = (i * 733) % 1920; x.beginPath(); x.arc(px, py, 2 + (i % 4), 0, Math.PI * 2); x.fill(); }
     var serif = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif', sans = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
     x.textAlign = 'center'; x.fillStyle = '#d9a441'; x.font = '600 40px ' + sans;
-    x.fillText(fitText(x, BRAND_NAME.toUpperCase(), 1000).split('').join(String.fromCharCode(8202)), 540, 140);
-    var self = !!S.selfOnly, top = self ? (S.topChannels || [])[0] : null;
+    x.fillText(fitText(x, brandFor(S).toUpperCase(), 1000).split('').join(String.fromCharCode(8202)), 540, 140);
+    var self = !!S.selfOnly, top = self ? (S.topChannels || [])[0] : null, pair = isPair(S) ? S.pair : null;
     // v6: a personal recap says "My year on Discord"; one server channel keeps its name; a DM is never named here.
-    var title = !self ? S.groupName : (S.channelCount === 1 && top && top.kind === 'server' ? top.label : 'My year on Discord');
+    var title = pair ? pair.names.join(' & ') : !self ? S.groupName : (S.channelCount === 1 && top && top.kind === 'server' ? top.label : 'My year on Discord');
     x.fillStyle = '#fffaf2'; x.font = '700 84px ' + serif; x.fillText(fitText(x, title || (self ? 'My year on Discord' : 'Our group chat'), 960), 540, 250);
     x.font = '700 200px ' + serif; x.fillStyle = '#fffaf2'; x.fillText(nf(S.total), 540, 470);
-    x.font = '400 44px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText((self ? 'messages I sent' : 'messages') + (S.usedYear ? ' in ' + S.year : ' (all time)'), 540, 535);
+    x.font = '400 44px ' + sans; x.fillStyle = '#e8dcc6'; x.fillText((self ? 'messages I sent' : pair ? 'messages between us' : 'messages') + (S.usedYear ? ' in ' + S.year : ' (all time)'), 540, 535);
     if (self) { x.font = '400 28px ' + sans; x.fillStyle = '#b8ab92'; x.fillText('only my own messages, from my Discord data package', 540, 580); } // v6
-    var rows = [[self ? 'Top channel' : 'Top talker', self ? shareChannel(top) : S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Longest streak', plural(S.streak.len, 'day')], ['Emoji of the year', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word of the year', S.topWords[0] ? S.topWords[0].key : '—']];
+    var rows = [pair ? ['First to text', firstTexter(pair)] : [self ? 'Top channel' : 'Top talker', self ? shareChannel(top) : S.topTalker.name], ['Busiest day', fmtDate(S.busiestDay.t)], ['Longest streak', plural(S.streak.len, 'day')], ['Emoji of the year', S.topEmojis[0] ? S.topEmojis[0].key : '—'], ['Word of the year', S.topWords[0] ? S.topWords[0].key : '—']];
     var y = 630; // v4: whole layout moved up to make room for the "Make yours" band + QR
     rows.forEach(function (r) { x.textAlign = 'left'; x.font = '400 40px ' + sans; x.fillStyle = '#d9a441'; x.fillText(r[0], 110, y); x.textAlign = 'right'; x.font = '700 46px ' + sans; x.fillStyle = '#fffaf2'; x.fillText(fitText(x, r[1], 520), 970, y); y += 72; });
     y += 4; x.strokeStyle = 'rgba(217,164,65,0.5)'; x.lineWidth = 2; x.beginPath(); x.moveTo(110, y); x.lineTo(970, y); x.stroke(); y += 64;
@@ -1616,7 +1772,7 @@
     }
     if (feat.length) {
       x.font = '700 50px ' + serif; x.fillStyle = '#d9a441';
-      x.fillText(state.unlocked ? (self ? 'My top badges' : 'Top awards') + (S.awards.length > feat.length ? ' (' + feat.length + ' of ' + S.awards.length + ')' : '') : S.awards.length + (self ? ' personal badges inside 🏆' : ' group awards inside 🏆'), 540, y);
+      x.fillText(state.unlocked ? (self ? 'My top badges' : 'Top awards') + (S.awards.length > feat.length ? ' (' + feat.length + ' of ' + S.awards.length + ')' : '') : S.awards.length + (self ? ' personal badges inside 🏆' : pair ? ' awards for two inside 🏆' : ' group awards inside 🏆'), 540, y);
       y += 30;
       feat.forEach(function (a) { card(y, a, !state.unlocked); y += 156; });
     } else {
@@ -1641,7 +1797,7 @@
   }
   function saveBlob(blob) {
     var url = URL.createObjectURL(blob), a = doc.createElement('a');
-    a.href = url; a.download = shareFilename();
+    a.href = url; a.download = shareFilename(state.stats);
     doc.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }
@@ -1649,7 +1805,7 @@
   // v4: "Share image" opens the phone's share sheet with the PNG; falls back to the download.
   function nativeShare() {
     var file;
-    try { file = shareFile(drawShare().toDataURL('image/png'), shareFilename()); } catch (e) { downloadShare(); return Promise.resolve('downloaded'); }
+    try { file = shareFile(drawShare().toDataURL('image/png'), shareFilename(state.stats)); } catch (e) { downloadShare(); return Promise.resolve('downloaded'); }
     return shareImage(root.navigator, file, function () { saveBlob(file); }).then(function (r) { api.lastShareResult = r; return r; });
   }
   function setupShareButton() {
@@ -1660,7 +1816,7 @@
   }
   api.drawShare = drawShare; api.nativeShare = nativeShare;
 
-  function reset() { state = { stats: null, slides: [], idx: 0, unlocked: false, paidMarker: state.paidMarker }; $('#deck-msg').hidden = true; $('#slides').textContent = ''; $('#deck').hidden = true; $('#intro').hidden = false; $('#paynote').hidden = true; $('#file').value = ''; $('#picker').hidden = true; setStatus(''); }
+  function reset() { state = { stats: null, slides: [], idx: 0, unlocked: false, paidMarker: state.paidMarker, paidPlan: state.paidPlan }; $('#deck-msg').hidden = true; $('#slides').textContent = ''; $('#deck').hidden = true; $('#intro').hidden = false; $('#paynote').hidden = true; $('#file').value = ''; $('#picker').hidden = true; setStatus(''); }
 
   function applyBrand() {
     doc.title = BRAND_NAME + ' — Zexley';
@@ -1676,6 +1832,8 @@
     ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
     drop.addEventListener('drop', function (e) { handleFiles(e.dataTransfer && e.dataTransfer.files); });
     $('#sample').addEventListener('click', function () { handleText($('#sample-chat').textContent, 'WhatsApp Chat - The Puddleworths 🎄 (sample).txt'); });
+    var sp = $('#sample-pair-btn'); // v7: the made-up 1-on-1 sample (Juniper and Wren)
+    if (sp && $('#sample-pair')) sp.addEventListener('click', function () { handleText($('#sample-pair').textContent, 'WhatsApp Chat - Wren (sample).txt'); });
     $('#prev').addEventListener('click', function () { show(state.idx - 1); });
     $('#next').addEventListener('click', function () { show(state.idx + 1); });
     doc.addEventListener('keydown', function (e) { if ($('#deck').hidden) return; if (e.key === 'ArrowRight') show(state.idx + 1); if (e.key === 'ArrowLeft') show(state.idx - 1); });

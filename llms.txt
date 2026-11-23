@@ -31,6 +31,7 @@ Free how-to pages that cite official export help and lead to Group Chat Wrapped.
 - [How to make a group chat year-in-review](https://zexley.com/guides/group-chat-year-in-review/): End-to-end recap for 2026.
 - [Group chat awards: 40+ superlative ideas](https://zexley.com/guides/group-chat-awards-ideas/): Kind award ideas to hand out yourselves, how to run an awards night, and which awards Group Chat Wrapped can count automatically.
 - [Group chat name ideas: 100+ names](https://zexley.com/guides/group-chat-name-ideas/): Original, kind group chat names by type, and how to rename a group in WhatsApp, iMessage, Telegram, Messenger, Instagram, and Discord (from official help pages).
+- [How to analyze a WhatsApp group chat privately](https://zexley.com/guides/whatsapp-chat-analyzer/): Which stats an official WhatsApp export gives (who texts most, busiest day and hour, top emoji and words, streaks), counted on your device; free by-hand method, free preview vs. $4.99 unlock, and limits.
 
 ## Optional
 

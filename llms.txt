@@ -34,6 +34,7 @@ Free how-to pages that cite official export help and lead to Group Chat Wrapped.
 - [How to analyze a WhatsApp group chat privately](https://zexley.com/guides/whatsapp-chat-analyzer/): Which stats an official WhatsApp export gives (who texts most, busiest day and hour, top emoji and words, streaks), counted on your device; free by-hand method, free preview vs. $4.99 unlock, and limits.
 - [How to analyze a Telegram group chat privately](https://zexley.com/guides/telegram-chat-analyzer/): Which stats a Telegram Desktop JSON export (result.json) gives (who texts most, busiest day and hour, top emoji and words, streaks), counted on your device; free by-hand method, free preview vs. $4.99 unlock, and limits.
 - [How to analyze an Instagram group chat privately](https://zexley.com/guides/instagram-chat-analyzer/): Which stats an Instagram Accounts Center download in JSON (message_1.json) gives (who texts most, busiest day and hour, top emoji and words, streaks), counted on your device; free by-hand method, free preview vs. $4.99 unlock, and limits.
+- [How to analyze a Facebook Messenger group chat privately](https://zexley.com/guides/messenger-chat-analyzer/): Which stats a Messenger download in JSON from Meta's Export your information tool (message_1.json) gives (who texts most, busiest day and hour, top emoji and words, streaks), counted on your device; free by-hand method, free preview vs. $4.99 unlock, end-to-end encrypted chat caveat, and limits.
 
 ## Optional
 

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to analyze a Facebook Messenger group chat (stats, who texts most, busiest times) privately — Zexley</title>
+  <meta name="description" content="Get Messenger group chat statistics from Meta&#x27;s Export your information download in JSON: who texts the most, busiest day and hour, top emoji and words, and streaks, counted on your device. What is free, honest limits, and how to do it by hand.">
+  <link rel="canonical" href="https://zexley.com/guides/messenger-chat-analyzer/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Zexley">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="How to analyze a Facebook Messenger group chat (stats, who texts most, busiest times) privately — Zexley">
+  <meta property="og:description" content="Get Messenger group chat statistics from Meta&#x27;s Export your information download in JSON: who texts the most, busiest day and hour, top emoji and words, and streaks, counted on your device. What is free, honest limits, and how to do it by hand.">
+  <meta property="og:url" content="https://zexley.com/guides/messenger-chat-analyzer/">
+  <meta property="og:image" content="https://zexley.com/og/wrapped.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Messenger chat analyzer: group chat stats, counted on your device">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="How to analyze a Facebook Messenger group chat (stats, who texts most, busiest times) privately — Zexley">
+  <meta name="twitter:description" content="Get Messenger group chat statistics from Meta&#x27;s Export your information download in JSON: who texts the most, busiest day and hour, top emoji and words, and streaks, counted on your device. What is free, honest limits, and how to do it by hand.">
+  <meta name="twitter:image" content="https://zexley.com/og/wrapped.png">
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../style.css">
+  <link rel="stylesheet" href="../../guides/guides.css">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://zexley.com/#organization",
+      "name": "Zexley",
+      "legalName": "Bloom Commerce LLC",
+      "url": "https://zexley.com/",
+      "email": "neo@zexley.com"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://zexley.com/guides/messenger-chat-analyzer/",
+      "url": "https://zexley.com/guides/messenger-chat-analyzer/",
+      "name": "How to analyze a Facebook Messenger group chat (stats, who texts most, busiest times) privately",
+      "description": "Get Messenger group chat statistics from Meta's Export your information download in JSON: who texts the most, busiest day and hour, top emoji and words, and streaks, counted on your device. What is free, honest limits, and how to do it by hand.",
+      "inLanguage": "en-US",
+      "datePublished": "2026-11-22",
+      "dateModified": "2026-11-22",
+      "isPartOf": {
+        "@id": "https://zexley.com/#website"
+      },
+      "publisher": {
+        "@id": "https://zexley.com/#organization"
+      },
+      "breadcrumb": {
+        "@id": "https://zexley.com/guides/messenger-chat-analyzer/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Zexley",
+          "item": "https://zexley.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Guides",
+          "item": "https://zexley.com/guides/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Messenger chat analyzer",
+          "item": "https://zexley.com/guides/messenger-chat-analyzer/"
+        }
+      ],
+      "@id": "https://zexley.com/guides/messenger-chat-analyzer/#breadcrumb"
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://zexley.com/guides/messenger-chat-analyzer/#howto",
+      "name": "Analyze a Facebook Messenger group chat privately",
+      "description": "How to export a Facebook Messenger group chat as JSON from Meta's Export your information tool and see its stats on your device.",
+      "inLanguage": "en-US",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "Open Meta Account settings",
+          "text": "On a computer, Meta's help says: click your profile picture, then Settings & privacy, then Settings, then Meta Account, then Your information and permissions. In the Facebook or Messenger app, look in Settings for Accounts Center or Meta Account. Meta says it is gradually updating people, so you may see either label."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "Create an export to your device",
+          "text": "Open Export your information, then Create export. Select the profile you want, then choose Export to device."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "Choose Messages, a date range, and JSON",
+          "text": "Choose specific information if you can, and include Messages. Pick a date range that covers 2026. Set the format to JSON. HTML will not work in Group Chat Wrapped. Meta says the media quality you pick changes the size of the files; lower quality keeps the download smaller, and the recap does not need photos or videos."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 4,
+          "name": "Start the export and wait",
+          "text": "Click or tap Start export. Meta says you will be asked for your password, and may be asked for extra verification. When the export is ready, Meta says you will get an email and a Facebook notification. It can take a while."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 5,
+          "name": "Download the ZIP within 4 days",
+          "text": "Meta says you have 4 days to download it from Available downloads in the Export your information tool. Save the ZIP somewhere only you can open."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 6,
+          "name": "Drop the ZIP into Group Chat Wrapped and pick the chat",
+          "text": "Open zexley.com/wrapped in your browser and drop in the ZIP, or the message_1.json file (plus message_2.json and so on) from one chat's folder. If the download holds several chats, you pick one from a list made on your device. The file is read in that browser tab and is not uploaded."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 7,
+          "name": "Read the free stats",
+          "text": "The first 4 slides are free: total messages, busiest day and hour, who talked most, and your longest streak. If the export contains 2026 messages, the recap counts 2026 only; otherwise it counts everything in the file and says so."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 8,
+          "name": "Unlock the rest only if you want it",
+          "text": "A one-time $4.99 ($2.99 for a 1-on-1 chat) unlocks the remaining slides: emoji and word of the year, laughs and media counts, up to 16 kind awards, a summary slide, and the full share image. If the unlock does not work or you are unhappy, email neo@zexley.com within 14 days of purchase for a refund."
+        }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://zexley.com/guides/messenger-chat-analyzer/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is there a free way to analyze a Messenger chat?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. You can count the chat's message_1.json file by hand in a text editor, or with a spreadsheet or short script on your own computer, for free. In Group Chat Wrapped, the sample chat and the first 4 slides of your own chat are free: total messages, busiest day and hour, who talked most, and your longest streak. A one-time $4.99 ($2.99 for a 1-on-1 chat) unlocks the rest."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I see how many messages each person sent in a Messenger group chat?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, from a JSON download. Group Chat Wrapped shows the top talker's message count and each member's share of the chat as a bar for up to 8 members, in the free slides."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is my Messenger chat uploaded or read by AI?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. The file is read by code in your browser tab and is never sent to us or anyone else. No AI reads your chat: the stats come from plain code. The tool and this page were made with AI assistance."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I export just one Messenger chat from inside the thread?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The official path we follow is an account export from Export your information, with Messages selected, not a button inside a single chat. That ZIP can contain many chats. In Group Chat Wrapped you pick one chat on your device."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "My download has lots of chats. Which one is analyzed?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Only the one you pick. Group Chat Wrapped lists the chats in the ZIP, biggest first, on your device, and the list is not saved. It reads only the chat files (message_1.json, message_2.json, and so on) and never sends or saves the rest of the download."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What about end-to-end encrypted Messenger chats?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Meta documents a separate download for end-to-end encrypted Messenger chats, and says it is currently only available on a computer: open facebook.com, click Messenger, then Options, Chat history, Last backup, then Download chat backup. Meta's export help page does not say whether those chats are in the Export your information download, so if a chat you expect is missing, that may be the reason. Group Chat Wrapped is built for the Export your information JSON download (message_1.json files). We have not tested the separate encrypted-chat backup format, so we do not claim it will open."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use the HTML download?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Group Chat Wrapped only reads the JSON files (message_1.json, and message_2.json and so on for long chats). Request your information again with the format set to JSON."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why do some numbers look off?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The recap can only count what is in your file, and counts can be imperfect. Group notices that Meta writes as ordinary messages in English, such as naming the group, nickname changes, people being added or leaving, and calls, are skipped, and so are reaction notices. Notices in other languages may be counted as messages."
+          }
+        }
+      ]
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site">
+    <div class="wrap nav">
+      <a class="brand" href="../../">Zex<span>ley</span></a>
+      <nav class="links" aria-label="Primary">
+        <a href="../../wrapped/">Group Chat Wrapped</a>
+        <a href="../../guides/">Guides</a>
+        <a href="../../rental-check/">Rental checker</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap legal guide">
+    <p class="crumbs"><a href="../../">Home</a> / <a href="../">Guides</a> / <span>Messenger chat analyzer</span></p>
+    <p class="kicker">Guide</p>
+    <h1>How to analyze a Facebook Messenger group chat (stats, who texts most, busiest times) privately</h1>
+    <p class="updated">Last updated November 23, 2026. Export steps checked against Meta's official Messenger help the same day.</p>
+    <p>To find out who sends the most messages in a Facebook Messenger group chat, when the group is busiest, or which emoji you use most, it helps to have a copy of the chat. Messenger chats are exported from Meta's Export your information tool, not from a button inside a single thread, so you request a copy of your information in JSON format, and a Messenger chat analyzer can then count the chat's message files. This guide covers what you can learn from a Messenger download, how to get the stats on your device without uploading the chat, how to count it by hand for free, and the limits to expect.</p>
+    <p>We make <a href="../../wrapped/">Group Chat Wrapped 2026</a>, the tool described here, so every stat below is one it actually computes. Group Chat Wrapped 2026 is not affiliated with, endorsed by, or connected to Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify.</p>
+
+    <h2>What stats you can get from a Messenger download</h2>
+    <p>In a JSON download, each chat has its own folder with a file named message_1.json, and long chats continue in message_2.json, message_3.json, and so on. In the files Group Chat Wrapped reads, each message has the sender's name, a time, and its text or attachments. From that, Group Chat Wrapped computes the following Messenger group chat statistics. The first four are free.</p>
+    <ul>
+      <li><strong>Total messages</strong> for 2026 (or for the whole file if it has no 2026 messages), plus how many people took part and how many days had at least one message. Free.</li>
+      <li><strong>Busiest times</strong>: the busiest day (with its message count), the busiest hour, the busiest weekday, and about how many messages a day the group sends. Times are shown in your device's time zone. Free.</li>
+      <li><strong>Who texts the most</strong>: the top talker's message count and share of the chat, plus a bar showing each member's share for up to 8 members. Free.</li>
+      <li><strong>Longest streak</strong>: the most days in a row with at least one message, with the start and end dates. Free.</li>
+      <li><strong>Emoji of the year</strong>: the group's top emoji and how often it was used, plus each member's favorite emoji (up to 8 members). Meta's JSON stores emoji and accented letters in a garbled form, and Group Chat Wrapped turns them back into real emoji and letters before counting. Unlock.</li>
+      <li><strong>Word of the year</strong>: the most-used word and four runners-up. Common words like “the” and members' own names are skipped. Unlock.</li>
+      <li><strong>Laughs and media</strong>: how many laughs (haha, lol, 😂, 🤣) and how many photos, videos, and stickers were shared. Photos, videos, GIFs, voice messages, files, and stickers are counted from the message entries in the JSON files. Unlock.</li>
+      <li><strong>Up to 16 kind awards</strong> picked by simple rules, such as Night Owl (most messages between midnight and 4 AM), Early Bird (5 to 8 AM), Conversation Starter (breaking the silence after 6 or more quiet hours), and Speedy Replier (typical reply time). Awards are for fun, not verdicts about anyone. Unlock.</li>
+      <li><strong>A summary slide and the full share image</strong>, made on your device. Unlock.</li>
+    </ul>
+    <p>The recap never shows the text of anyone's messages. It shows names, counts, top words and emoji, and awards.</p>
+
+    <h2>How to analyze a Messenger group chat, step by step</h2>
+    <p>The export steps follow <a href="https://www.facebook.com/help/messenger-app/212802592074644">Export a copy of your Facebook information</a> in the Messenger Help Center. You can also reach the same tool from Facebook or Messenger settings, and wording can differ slightly between the app and a computer.</p>
+    <ol class="steps">
+        <li><strong>Open Meta Account settings</strong> On a computer, Meta's help says: click your profile picture, then Settings &amp; privacy, then Settings, then Meta Account, then Your information and permissions. In the Facebook or Messenger app, look in Settings for Accounts Center or Meta Account. Meta says it is gradually updating people, so you may see either label.</li>
+        <li><strong>Create an export to your device</strong> Open Export your information, then Create export. Select the profile you want, then choose Export to device.</li>
+        <li><strong>Choose Messages, a date range, and JSON</strong> Choose specific information if you can, and include Messages. Pick a date range that covers 2026. Set the format to JSON. HTML will not work in Group Chat Wrapped. Meta says the media quality you pick changes the size of the files; lower quality keeps the download smaller, and the recap does not need photos or videos.</li>
+        <li><strong>Start the export and wait</strong> Click or tap Start export. Meta says you will be asked for your password, and may be asked for extra verification. When the export is ready, Meta says you will get an email and a Facebook notification. It can take a while.</li>
+        <li><strong>Download the ZIP within 4 days</strong> Meta says you have 4 days to download it from Available downloads in the Export your information tool. Save the ZIP somewhere only you can open.</li>
+        <li><strong>Drop the ZIP into Group Chat Wrapped and pick the chat</strong> Open zexley.com/wrapped in your browser and drop in the ZIP, or the message_1.json file (plus message_2.json and so on) from one chat's folder. If the download holds several chats, you pick one from a list made on your device. The file is read in that browser tab and is not uploaded.</li>
+        <li><strong>Read the free stats</strong> The first 4 slides are free: total messages, busiest day and hour, who talked most, and your longest streak. If the export contains 2026 messages, the recap counts 2026 only; otherwise it counts everything in the file and says so.</li>
+        <li><strong>Unlock the rest only if you want it</strong> A one-time $4.99 ($2.99 for a 1-on-1 chat) unlocks the remaining slides: emoji and word of the year, laughs and media counts, up to 16 kind awards, a summary slide, and the full share image. If the unlock does not work or you are unhappy, email neo@zexley.com within 14 days of purchase for a refund.</li>
+    </ol>
+    <p>For the full download walkthrough, including how to find a chat's files inside the ZIP, see <a href="../download-messenger-chat-history/">How to download your Facebook Messenger chat history</a>.</p>
+
+    <h2>Privacy: what “on your device” means</h2>
+    <ul>
+      <li><strong>The chat is not uploaded.</strong> The file is read by JavaScript in your browser tab and is never sent to us or anyone else. There is no server step.</li>
+      <li><strong>Only the chat you pick is read.</strong> A Meta download can contain much more than your chats, such as other chats and profile information. Group Chat Wrapped opens the ZIP only in your browser, reads only the chat files, and never sends or saves the rest. The list of chats you pick from is shown only on your device and is not saved.</li>
+      <li><strong>The page cannot send it anywhere.</strong> The Group Chat Wrapped page's Content Security Policy sets connect-src 'none', which tells your browser not to let the page's scripts open network connections. Once loaded, the page makes no network requests and has no analytics or cookies. Choosing to unlock takes you to Stripe's checkout page. You can even turn on airplane mode after the page loads and it still works.</li>
+      <li><strong>No AI reads your chat.</strong> The stats come from plain code running on your device. Zexley is AI-run, and the tool and this page were made with AI assistance.</li>
+      <li><strong>Only if you unlock, finished stats are saved in your browser.</strong> Just before checkout, the finished stats (names, counts, top words and emoji, and awards, never your messages) are saved in your browser's local storage so the recap reopens when you come back. They are deleted after 2 hours if you do not pay, 24 hours after you pay, or right away when you press “Forget my recap now”. Nothing is sent to us.</li>
+      <li><strong>Payment goes through Stripe.</strong> Stripe collects your payment details and email on its own checkout page. We receive the payment confirmation, your email, the amount, and a random reference code, never your chat or its stats.</li>
+      <li><strong>Hosting logs.</strong> Our web host (GitHub Pages) may keep standard technical logs of page requests, such as IP address and the page address. We do not receive or use these logs.</li>
+    </ul>
+    <p>Meta's help reminds you that your download may contain private information, so keep it secure. The ZIP contains other people's names and messages, so keep it somewhere only you can open, and delete it when you are done. Details are in our <a href="../../privacy.html">Privacy</a> page and <a href="../../terms.html">Terms</a>.</p>
+
+    <h2>Doing it by hand, and what is free</h2>
+    <p><strong>By hand, free.</strong> The chat's message_1.json is plain text, so you can count it yourself. In the files Group Chat Wrapped reads, each message has a "sender_name" field with the sender's name and a "timestamp_ms" field with the time in milliseconds, and messages are listed newest first. Open the file in a text editor and search for a member's name to get a rough count, keeping in mind that the name also matches wherever it appears in message text, then repeat in message_2.json and any later files. A spreadsheet or a short script on your own computer can tally senders, days, and hours more exactly. Emoji and accented letters are stored as escaped codes, so searching for an emoji usually finds nothing. Treat a hand count as approximate.</p>
+    <p><strong>Free in Group Chat Wrapped.</strong> There is no account or sign-up. You can try it with a made-up sample chat, and for your own chat the first 4 slides are free: total messages, busiest day and hour, who talked most, and your longest streak.</p>
+    <p><strong>The paid part.</strong> A one-time $4.99 ($2.99 for a 1-on-1 chat) unlocks the remaining slides and the full share image for that recap. It is not a subscription. If the unlock does not work or you are unhappy, email neo@zexley.com within 14 days of purchase and we will refund what you paid. You do not need to send us your chat. The unlock is remembered only in the browser you paid from, for up to 24 hours, and does not carry over to another device or browser.</p>
+
+    <h2>Limits to know before you start</h2>
+    <ul>
+      <li><strong>Only what is in your download.</strong> The recap counts only the messages in the chat's JSON files. If your date range or the download leaves part of the chat out, it is not in the recap.</li>
+      <li><strong>End-to-end encrypted chats.</strong> Meta documents a <a href="https://www.facebook.com/help/677912386869109">separate download for end-to-end encrypted chats</a>, available only on a computer, and its export help page does not say whether those chats are in the Export your information download. We have not tested that separate backup format, so we do not claim Group Chat Wrapped can open it.</li>
+      <li><strong>It can take a while.</strong> Meta prepares the export and notifies you when it is ready. Once it is ready, Meta says you have 4 days to download it.</li>
+      <li><strong>JSON and one chat at a time.</strong> The HTML format is not read. If the download holds several chats, you pick one.</li>
+      <li><strong>Big downloads on a phone.</strong> Very large Meta downloads may fail in a phone browser. Choose Messages only and lower media quality, or unzip on a computer and drop just that chat's message_1.json (plus any numbered follow-on files).</li>
+      <li><strong>Group notices are recognized in English.</strong> Notices Meta writes as ordinary messages, such as naming the group or changing nicknames, are skipped when they are in English. In other languages they may be counted as messages.</li>
+      <li><strong>2026 first.</strong> If the chat has 2026 messages, the recap counts 2026 only. Otherwise it counts everything and says so.</li>
+      <li><strong>Who talked most is a message count.</strong> It is not a measure of who wrote the longest messages. Many short replies add up.</li>
+      <li><strong>Other apps.</strong> Instagram chats from a Meta download work the same way, and WhatsApp and Telegram exports also work, in the formats described in our guides. A Discord data package gives a personal recap of your own messages only. iMessage and Signal are not supported yet.</li>
+    </ul>
+
+    <h2>Get the group's OK before sharing a recap</h2>
+    <p>A group chat holds other people's messages too. Only use chats you are a member of. A recap slide or share image shows members' names and how often they wrote, so ask the group before you post it anywhere outside the chat, and keep it kind. Our <a href="../../terms.html">Terms</a> ask you not to use the results to mock, embarrass, or harass a member of the chat. If anyone would rather not be included in a shared image, do not share it.</p>
+    <div class="cta-band">
+      <h2>See your group chat's year</h2>
+      <p><a href="../../wrapped/">Group Chat Wrapped 2026</a> reads a WhatsApp, Instagram, Messenger, or Telegram export on your device and builds a recap: who talked most, your busiest day, and kind group awards. You can also drop in a Discord data package for a personal recap of your own messages (Discord’s package does not include anyone else’s). The first 4 slides are free. A one-time $4.99 ($2.99 for a 1-on-1 chat) unlocks the rest, including the share image, with 14-day refunds. The chat is never uploaded. No AI reads your messages. Group Chat Wrapped 2026 is not affiliated with, endorsed by, or connected to Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify.</p>
+      <p class="btn-row" style="margin-top:1rem"><a class="btn" href="../../wrapped/">Open Group Chat Wrapped</a></p>
+    </div>
+    <h2>Common questions</h2>
+    <div class="faq">
+      <details>
+        <summary>Is there a free way to analyze a Messenger chat?</summary>
+        <p>Yes. You can count the chat's message_1.json file by hand in a text editor, or with a spreadsheet or short script on your own computer, for free. In Group Chat Wrapped, the sample chat and the first 4 slides of your own chat are free: total messages, busiest day and hour, who talked most, and your longest streak. A one-time $4.99 ($2.99 for a 1-on-1 chat) unlocks the rest.</p>
+      </details>
+      <details>
+        <summary>Can I see how many messages each person sent in a Messenger group chat?</summary>
+        <p>Yes, from a JSON download. Group Chat Wrapped shows the top talker's message count and each member's share of the chat as a bar for up to 8 members, in the free slides.</p>
+      </details>
+      <details>
+        <summary>Is my Messenger chat uploaded or read by AI?</summary>
+        <p>No. The file is read by code in your browser tab and is never sent to us or anyone else. No AI reads your chat: the stats come from plain code. The tool and this page were made with AI assistance.</p>
+      </details>
+      <details>
+        <summary>Can I export just one Messenger chat from inside the thread?</summary>
+        <p>The official path we follow is an account export from Export your information, with Messages selected, not a button inside a single chat. That ZIP can contain many chats. In Group Chat Wrapped you pick one chat on your device.</p>
+      </details>
+      <details>
+        <summary>My download has lots of chats. Which one is analyzed?</summary>
+        <p>Only the one you pick. Group Chat Wrapped lists the chats in the ZIP, biggest first, on your device, and the list is not saved. It reads only the chat files (message_1.json, message_2.json, and so on) and never sends or saves the rest of the download.</p>
+      </details>
+      <details>
+        <summary>What about end-to-end encrypted Messenger chats?</summary>
+        <p>Meta documents a separate download for end-to-end encrypted Messenger chats, and says it is currently only available on a computer: open facebook.com, click Messenger, then Options, Chat history, Last backup, then Download chat backup. Meta's export help page does not say whether those chats are in the Export your information download, so if a chat you expect is missing, that may be the reason. Group Chat Wrapped is built for the Export your information JSON download (message_1.json files). We have not tested the separate encrypted-chat backup format, so we do not claim it will open.</p>
+      </details>
+      <details>
+        <summary>Can I use the HTML download?</summary>
+        <p>No. Group Chat Wrapped only reads the JSON files (message_1.json, and message_2.json and so on for long chats). Request your information again with the format set to JSON.</p>
+      </details>
+      <details>
+        <summary>Why do some numbers look off?</summary>
+        <p>The recap can only count what is in your file, and counts can be imperfect. Group notices that Meta writes as ordinary messages in English, such as naming the group, nickname changes, people being added or leaving, and calls, are skipped, and so are reaction notices. Notices in other languages may be counted as messages.</p>
+      </details>
+    </div>
+    <h2>Official sources</h2>
+    <p>The export steps above follow these official Meta help pages. The apps can change their menus, so if something looks different, use the official page as the source of truth.</p>
+    <ul class="sources">
+      <li><a href="https://www.facebook.com/help/messenger-app/212802592074644">Messenger Help Center: Export a copy of your Facebook information</a>. Checked November 23, 2026.</li>
+      <li><a href="https://www.facebook.com/help/677912386869109">Facebook Help Center: Download your data from Messenger end-to-end encrypted chats</a>. Checked November 23, 2026.</li>
+    </ul>
+    <div class="related">
+      <h2>Related guides</h2>
+      <ul>
+      <li><a href="../download-messenger-chat-history/">How to download a Messenger chat history</a></li>
+      <li><a href="../instagram-chat-analyzer/">How to analyze an Instagram group chat privately</a></li>
+      <li><a href="../whatsapp-chat-analyzer/">How to analyze a WhatsApp group chat privately</a></li>
+      <li><a href="../telegram-chat-analyzer/">How to analyze a Telegram group chat privately</a></li>
+      <li><a href="../who-texts-the-most-in-a-group-chat/">How to see who texts the most in a group chat</a></li>
+      </ul>
+    </div>
+    <p class="note">Zexley is an AI-run company, and these pages were written with AI assistance and checked against our publishing rules before they go live. Spot an error? Email <a href="mailto:neo@zexley.com">neo@zexley.com</a>.</p>
+  </main>
+
+  <footer class="site">
+    <div class="wrap foot-grid">
+      <div>
+        <p><a class="brand" href="../../">Zex<span>ley</span></a></p>
+        <p>Zexley is a brand of Bloom Commerce LLC (Indiana), an AI-run company. Our tools and copy are made with AI assistance.</p>
+        <p class="foot-disclose">Group Chat Wrapped 2026 is not affiliated with, endorsed by, or connected to Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify.</p>
+        <p><a href="mailto:neo@zexley.com">neo@zexley.com</a></p>
+      </div>
+      <div><p><a href="../../wrapped/">Group Chat Wrapped 2026</a><br><a href="../../guides/">Guides</a><br><a href="../../rental-check/">Rental red-flag checker</a></p></div>
+      <div><p><a href="../../privacy.html">Privacy</a><br><a href="../../terms.html">Terms</a></p></div>
+    </div>
+  </footer>
+</body>
+</html>

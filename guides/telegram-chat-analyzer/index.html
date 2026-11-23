@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to analyze a Telegram group chat (stats, who texts most, busiest times) privately — Zexley</title>
+  <meta name="description" content="Get Telegram group chat statistics from Telegram Desktop&#x27;s JSON export: who texts the most, busiest day and hour, top emoji and words, and streaks, counted on your device. What is free, honest limits, and how to do it by hand.">
+  <link rel="canonical" href="https://zexley.com/guides/telegram-chat-analyzer/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Zexley">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="How to analyze a Telegram group chat (stats, who texts most, busiest times) privately — Zexley">
+  <meta property="og:description" content="Get Telegram group chat statistics from Telegram Desktop&#x27;s JSON export: who texts the most, busiest day and hour, top emoji and words, and streaks, counted on your device. What is free, honest limits, and how to do it by hand.">
+  <meta property="og:url" content="https://zexley.com/guides/telegram-chat-analyzer/">
+  <meta property="og:image" content="https://zexley.com/og/wrapped.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Telegram chat analyzer: group chat stats, counted on your device">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="How to analyze a Telegram group chat (stats, who texts most, busiest times) privately — Zexley">
+  <meta name="twitter:description" content="Get Telegram group chat statistics from Telegram Desktop&#x27;s JSON export: who texts the most, busiest day and hour, top emoji and words, and streaks, counted on your device. What is free, honest limits, and how to do it by hand.">
+  <meta name="twitter:image" content="https://zexley.com/og/wrapped.png">
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../../style.css">
+  <link rel="stylesheet" href="../../guides/guides.css">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://zexley.com/#organization",
+      "name": "Zexley",
+      "legalName": "Bloom Commerce LLC",
+      "url": "https://zexley.com/",
+      "email": "neo@zexley.com"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://zexley.com/guides/telegram-chat-analyzer/",
+      "url": "https://zexley.com/guides/telegram-chat-analyzer/",
+      "name": "How to analyze a Telegram group chat (stats, who texts most, busiest times) privately",
+      "description": "Get Telegram group chat statistics from Telegram Desktop's JSON export: who texts the most, busiest day and hour, top emoji and words, and streaks, counted on your device. What is free, honest limits, and how to do it by hand.",
+      "inLanguage": "en-US",
+      "datePublished": "2026-11-22",
+      "dateModified": "2026-11-22",
+      "isPartOf": {
+        "@id": "https://zexley.com/#website"
+      },
+      "publisher": {
+        "@id": "https://zexley.com/#organization"
+      },
+      "breadcrumb": {
+        "@id": "https://zexley.com/guides/telegram-chat-analyzer/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Zexley",
+          "item": "https://zexley.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Guides",
+          "item": "https://zexley.com/guides/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Telegram chat analyzer",
+          "item": "https://zexley.com/guides/telegram-chat-analyzer/"
+        }
+      ],
+      "@id": "https://zexley.com/guides/telegram-chat-analyzer/#breadcrumb"
+    },
+    {
+      "@type": "HowTo",
+      "@id": "https://zexley.com/guides/telegram-chat-analyzer/#howto",
+      "name": "Analyze a Telegram group chat privately",
+      "description": "How to export a Telegram group chat as JSON from Telegram Desktop and see its stats on your device.",
+      "inLanguage": "en-US",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "Install Telegram Desktop and sign in",
+          "text": "Telegram's export tool is in the official Telegram Desktop app on a computer (Windows, macOS, or Linux), not in the iPhone or Android apps. Install the latest version and sign in."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "Open the group and choose Export chat history",
+          "text": "Open the group in Telegram Desktop, click the three-dot menu at the top right, and choose Export chat history."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "Leave media off and set the format to JSON",
+          "text": "Untick photos, videos, and other media, because the stats do not need them and the export stays much smaller. Set Format to Machine-readable JSON. The HTML format will not work."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 4,
+          "name": "Export and find result.json",
+          "text": "Click Export and leave Telegram open until it finishes. The export folder usually contains a file named result.json, plus any media folders you included."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 5,
+          "name": "Drop result.json into Group Chat Wrapped",
+          "text": "Open zexley.com/wrapped in your browser and drop in result.json, or a ZIP of the export folder. The file is read in that browser tab and is not uploaded."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 6,
+          "name": "Read the free stats",
+          "text": "The first 4 slides are free: total messages, busiest day and hour, who talked most, and your longest streak. If the export contains 2026 messages, the recap counts 2026 only; otherwise it counts everything in the file and says so."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 7,
+          "name": "Unlock the rest only if you want it",
+          "text": "A one-time $4.99 unlocks the remaining slides: emoji and word of the year, laughs and media counts, up to 16 kind awards, a summary slide, and the full share image. If the unlock does not work or you are unhappy, email neo@zexley.com within 14 days of purchase for a refund."
+        }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://zexley.com/guides/telegram-chat-analyzer/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is there a free way to analyze a Telegram chat?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. You can count result.json by hand in a text editor, or with a spreadsheet or short script on your own computer, for free. In Group Chat Wrapped, the sample chat and the first 4 slides of your own chat are free: total messages, busiest day and hour, who talked most, and your longest streak. A one-time $4.99 unlocks the rest."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I see how many messages each person sent in a Telegram group?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, from a JSON export. Group Chat Wrapped shows the top talker's message count and each member's share of the chat as a bar for up to 8 members, in the free slides."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is my Telegram chat uploaded or read by AI?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. The file is read by code in your browser tab and is never sent to us or anyone else. No AI reads your chat: the stats come from plain code. The tool and this page were made with AI assistance."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I export a Telegram chat on my phone?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Telegram documents the export tool in Telegram Desktop on a computer. We do not have official phone-app steps for a JSON chat export, so use Desktop, then drop the file into Group Chat Wrapped in a browser on that computer."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does it say my file is a full account export?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Group Chat Wrapped reads one chat at a time. A full-account export, made from Settings, then Advanced, then Export Telegram data, is not read. Open the group in Telegram Desktop, choose Export chat history, and pick Machine-readable JSON instead."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use Telegram's HTML export?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Group Chat Wrapped does not read the HTML export (messages.html or export_results.html). Export the chat again with Format set to Machine-readable JSON and drop result.json."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why do some numbers look off?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The recap can only count what is in your file, and counts can be imperfect. Service messages, such as joins, pins, title changes, and calls, are skipped. Messages that have no sender name in the export are counted under Deleted Account."
+          }
+        }
+      ]
+    }
+  ]
+}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site">
+    <div class="wrap nav">
+      <a class="brand" href="../../">Zex<span>ley</span></a>
+      <nav class="links" aria-label="Primary">
+        <a href="../../wrapped/">Group Chat Wrapped</a>
+        <a href="../../guides/">Guides</a>
+        <a href="../../rental-check/">Rental checker</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap legal guide">
+    <p class="crumbs"><a href="../../">Home</a> / <a href="../">Guides</a> / <span>Telegram chat analyzer</span></p>
+    <p class="kicker">Guide</p>
+    <h1>How to analyze a Telegram group chat (stats, who texts most, busiest times) privately</h1>
+    <p class="updated">Last updated November 23, 2026.</p>
+    <p>To find out who sends the most messages in a Telegram group, when the group is busiest, or which emoji you use most, it helps to have a copy of the chat. Telegram Desktop's Export chat history tool gives you that copy as a machine-readable JSON file, and a Telegram chat analyzer can then count it. This guide covers what you can learn from a Telegram export, how to get the stats on your device without uploading the chat, how to count it by hand for free, and the limits to expect.</p>
+    <p>We make <a href="../../wrapped/">Group Chat Wrapped 2026</a>, the tool described here, so every stat below is one it actually computes. Group Chat Wrapped 2026 is not affiliated with, endorsed by, or connected to Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify.</p>
+
+    <h2>What stats you can get from a Telegram export</h2>
+    <p>Telegram's data export schema says each message in the JSON export has a date, the sender's name, and its text, and that regular messages are marked separately from service messages such as joins and pins. From that, Group Chat Wrapped computes the following Telegram group chat statistics. The first four are free.</p>
+    <ul>
+      <li><strong>Total messages</strong> for 2026 (or for the whole file if it has no 2026 messages), plus how many people took part and how many days had at least one message. Free.</li>
+      <li><strong>Busiest times</strong>: the busiest day (with its message count), the busiest hour, the busiest weekday, and about how many messages a day the group sends. Free.</li>
+      <li><strong>Who texts the most</strong>: the top talker's message count and share of the chat, plus a bar showing each member's share for up to 8 members. Free.</li>
+      <li><strong>Longest streak</strong>: the most days in a row with at least one message, with the start and end dates. Free.</li>
+      <li><strong>Emoji of the year</strong>: the group's top emoji and how often it was used, plus each member's favorite emoji (up to 8 members). Unlock.</li>
+      <li><strong>Word of the year</strong>: the most-used word and four runners-up. Common words like “the” and members' own names are skipped. Unlock.</li>
+      <li><strong>Laughs and media</strong>: how many laughs (haha, lol, 😂, 🤣) and how many photos, videos, and stickers were shared. Photos, stickers, voice messages, and files are counted from the message entries in result.json, so you can leave media off when you export. Unlock.</li>
+      <li><strong>Up to 16 kind awards</strong> picked by simple rules, such as Night Owl (most messages between midnight and 4 AM), Early Bird (5 to 8 AM), Conversation Starter (breaking the silence after 6 or more quiet hours), and Speedy Replier (typical reply time). Awards are for fun, not verdicts about anyone. Unlock.</li>
+      <li><strong>A summary slide and the full share image</strong>, made on your device. Unlock.</li>
+    </ul>
+    <p>The recap never shows the text of anyone's messages. It shows names, counts, top words and emoji, and awards.</p>
+
+    <h2>How to analyze a Telegram group chat, step by step</h2>
+    <ol class="steps">
+        <li><strong>Install Telegram Desktop and sign in</strong> Telegram's export tool is in the official Telegram Desktop app on a computer (Windows, macOS, or Linux), not in the iPhone or Android apps. Install the latest version and sign in.</li>
+        <li><strong>Open the group and choose Export chat history</strong> Open the group in Telegram Desktop, click the three-dot menu at the top right, and choose Export chat history.</li>
+        <li><strong>Leave media off and set the format to JSON</strong> Untick photos, videos, and other media, because the stats do not need them and the export stays much smaller. Set Format to Machine-readable JSON. The HTML format will not work.</li>
+        <li><strong>Export and find result.json</strong> Click Export and leave Telegram open until it finishes. The export folder usually contains a file named result.json, plus any media folders you included.</li>
+        <li><strong>Drop result.json into Group Chat Wrapped</strong> Open zexley.com/wrapped in your browser and drop in result.json, or a ZIP of the export folder. The file is read in that browser tab and is not uploaded.</li>
+        <li><strong>Read the free stats</strong> The first 4 slides are free: total messages, busiest day and hour, who talked most, and your longest streak. If the export contains 2026 messages, the recap counts 2026 only; otherwise it counts everything in the file and says so.</li>
+        <li><strong>Unlock the rest only if you want it</strong> A one-time $4.99 unlocks the remaining slides: emoji and word of the year, laughs and media counts, up to 16 kind awards, a summary slide, and the full share image. If the unlock does not work or you are unhappy, email neo@zexley.com within 14 days of purchase for a refund.</li>
+    </ol>
+    <p>For the full export walkthrough, with Telegram's official pages and what result.json contains, see <a href="../export-telegram-chat/">How to export a Telegram chat as JSON</a>. Telegram's <a href="https://core.telegram.org/import-export">data export schema</a> says a single-chat export is stored in result.json as one chat object, including its messages.</p>
+
+    <h2>Privacy: what “on your device” means</h2>
+    <ul>
+      <li><strong>The chat is not uploaded.</strong> The file is read by JavaScript in your browser tab and is never sent to us or anyone else. There is no server step.</li>
+      <li><strong>The page cannot send it anywhere.</strong> The Group Chat Wrapped page's Content Security Policy sets connect-src 'none', which tells your browser not to let the page's scripts open network connections. Once loaded, the page makes no network requests and has no analytics or cookies. Choosing to unlock takes you to Stripe's checkout page. You can even turn on airplane mode after the page loads and it still works.</li>
+      <li><strong>No AI reads your chat.</strong> The stats come from plain code running on your device. Zexley is AI-run, and the tool and this page were made with AI assistance.</li>
+      <li><strong>Only if you unlock, finished stats are saved in your browser.</strong> Just before checkout, the finished stats (names, counts, top words and emoji, and awards, never your messages) are saved in your browser's local storage so the recap reopens when you come back. They are deleted after 2 hours if you do not pay, 24 hours after you pay, or right away when you press “Forget my recap now”. Nothing is sent to us.</li>
+      <li><strong>Payment goes through Stripe.</strong> Stripe collects your payment details and email on its own checkout page. We receive the payment confirmation, your email, the amount, and a random reference code, never your chat or its stats.</li>
+      <li><strong>Hosting logs.</strong> Our web host (GitHub Pages) may keep standard technical logs of page requests, such as IP address and the page address. We do not receive or use these logs.</li>
+    </ul>
+    <p>The export folder itself contains other people's names and messages, so keep it somewhere only you can open, and delete it when you are done. Details are in our <a href="../../privacy.html">Privacy</a> page and <a href="../../terms.html">Terms</a>.</p>
+
+    <h2>Doing it by hand, and what is free</h2>
+    <p><strong>By hand, free.</strong> result.json is plain text, so you can count it yourself. According to Telegram's export schema, each message has a "type" (message for regular messages, service for things like joins and pins), a "from" field with the sender's name, and a "date" timestamp such as 2026-09-03T17:05:43. Open the file in a text editor and search for a member's name to get a rough count, keeping in mind that the name also matches wherever it appears in message text. A spreadsheet or a short script on your own computer can tally senders, days, and hours more exactly. Treat a hand count as approximate. If you just want to read the chat, Telegram's HTML export opens in a web browser, but it does not count anything.</p>
+    <p><strong>Free in Group Chat Wrapped.</strong> There is no account or sign-up. You can try it with a made-up sample chat, and for your own chat the first 4 slides are free: total messages, busiest day and hour, who talked most, and your longest streak.</p>
+    <p><strong>The paid part.</strong> A one-time $4.99 unlocks the remaining slides and the full share image for that recap. It is not a subscription. If the unlock does not work or you are unhappy, email neo@zexley.com within 14 days of purchase and we will refund the $4.99. You do not need to send us your chat. The unlock is remembered only in the browser you paid from, for up to 24 hours, and does not carry over to another device or browser.</p>
+
+    <h2>Limits to know before you start</h2>
+    <ul>
+      <li><strong>Only what is in your export.</strong> The recap counts only the messages in your result.json. If part of the group's history is not in the file, it is not in the recap.</li>
+      <li><strong>A computer, not a phone.</strong> Telegram documents the export tool in Telegram Desktop, so you need a Windows, macOS, or Linux computer to make the file.</li>
+      <li><strong>JSON and one chat at a time.</strong> The HTML export is not read, and neither is a full-account export from Export Telegram data. Export just the group you want.</li>
+      <li><strong>Service messages are skipped.</strong> Joins, pins, title changes, and calls are not counted as messages. Messages that have no sender name in the export are counted under Deleted Account.</li>
+      <li><strong>2026 first.</strong> If the chat has 2026 messages, the recap counts 2026 only. Otherwise it counts everything and says so.</li>
+      <li><strong>Who talked most is a message count.</strong> It is not a measure of who wrote the longest messages. Many short replies add up.</li>
+      <li><strong>Other apps.</strong> WhatsApp, Instagram, and Messenger exports also work, in the formats described in our guides. A Discord data package gives a personal recap of your own messages only. iMessage and Signal are not supported yet.</li>
+    </ul>
+
+    <h2>Get the group's OK before sharing a recap</h2>
+    <p>A group chat holds other people's messages too. Only use chats you are a member of. A recap slide or share image shows members' names and how often they wrote, so ask the group before you post it anywhere outside the chat, and keep it kind. Our <a href="../../terms.html">Terms</a> ask you not to use the results to mock, embarrass, or harass a member of the chat. If anyone would rather not be included in a shared image, do not share it.</p>
+    <div class="cta-band">
+      <h2>See your group chat's year</h2>
+      <p><a href="../../wrapped/">Group Chat Wrapped 2026</a> reads a WhatsApp, Instagram, Messenger, or Telegram export on your device and builds a recap: who talked most, your busiest day, and kind group awards. You can also drop in a Discord data package for a personal recap of your own messages (Discord’s package does not include anyone else’s). The first 4 slides are free. A one-time $4.99 unlocks the rest, including the share image, with 14-day refunds. The chat is never uploaded. No AI reads your messages. Group Chat Wrapped 2026 is not affiliated with, endorsed by, or connected to Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify.</p>
+      <p class="btn-row" style="margin-top:1rem"><a class="btn" href="../../wrapped/">Open Group Chat Wrapped</a></p>
+    </div>
+    <h2>Common questions</h2>
+    <div class="faq">
+      <details>
+        <summary>Is there a free way to analyze a Telegram chat?</summary>
+        <p>Yes. You can count result.json by hand in a text editor, or with a spreadsheet or short script on your own computer, for free. In Group Chat Wrapped, the sample chat and the first 4 slides of your own chat are free: total messages, busiest day and hour, who talked most, and your longest streak. A one-time $4.99 unlocks the rest.</p>
+      </details>
+      <details>
+        <summary>Can I see how many messages each person sent in a Telegram group?</summary>
+        <p>Yes, from a JSON export. Group Chat Wrapped shows the top talker's message count and each member's share of the chat as a bar for up to 8 members, in the free slides.</p>
+      </details>
+      <details>
+        <summary>Is my Telegram chat uploaded or read by AI?</summary>
+        <p>No. The file is read by code in your browser tab and is never sent to us or anyone else. No AI reads your chat: the stats come from plain code. The tool and this page were made with AI assistance.</p>
+      </details>
+      <details>
+        <summary>Can I export a Telegram chat on my phone?</summary>
+        <p>Telegram documents the export tool in Telegram Desktop on a computer. We do not have official phone-app steps for a JSON chat export, so use Desktop, then drop the file into Group Chat Wrapped in a browser on that computer.</p>
+      </details>
+      <details>
+        <summary>Why does it say my file is a full account export?</summary>
+        <p>Group Chat Wrapped reads one chat at a time. A full-account export, made from Settings, then Advanced, then Export Telegram data, is not read. Open the group in Telegram Desktop, choose Export chat history, and pick Machine-readable JSON instead.</p>
+      </details>
+      <details>
+        <summary>Can I use Telegram's HTML export?</summary>
+        <p>No. Group Chat Wrapped does not read the HTML export (messages.html or export_results.html). Export the chat again with Format set to Machine-readable JSON and drop result.json.</p>
+      </details>
+      <details>
+        <summary>Why do some numbers look off?</summary>
+        <p>The recap can only count what is in your file, and counts can be imperfect. Service messages, such as joins, pins, title changes, and calls, are skipped. Messages that have no sender name in the export are counted under Deleted Account.</p>
+      </details>
+    </div>
+    <h2>Official sources</h2>
+    <p>The export steps above follow these official Telegram pages. The apps can change their menus, so if something looks different, use the official page as the source of truth.</p>
+    <ul class="sources">
+      <li><a href="https://telegram.org/blog/export-and-more">Telegram Blog: Chat Export Tool, Better Notifications and More</a>. Checked November 23, 2026.</li>
+      <li><a href="https://core.telegram.org/import-export">Telegram: Data Export Schema</a>. Checked November 23, 2026.</li>
+    </ul>
+    <div class="related">
+      <h2>Related guides</h2>
+      <ul>
+      <li><a href="../export-telegram-chat/">How to export a Telegram chat as JSON</a></li>
+      <li><a href="../whatsapp-chat-analyzer/">How to analyze a WhatsApp group chat privately</a></li>
+      <li><a href="../who-texts-the-most-in-a-group-chat/">How to see who texts the most in a group chat</a></li>
+      <li><a href="../group-chat-year-in-review/">Make a group chat year-in-review</a></li>
+      </ul>
+    </div>
+    <p class="note">Zexley is an AI-run company, and these pages were written with AI assistance and checked against our publishing rules before they go live. Spot an error? Email <a href="mailto:neo@zexley.com">neo@zexley.com</a>.</p>
+  </main>
+
+  <footer class="site">
+    <div class="wrap foot-grid">
+      <div>
+        <p><a class="brand" href="../../">Zex<span>ley</span></a></p>
+        <p>Zexley is a brand of Bloom Commerce LLC (Indiana), an AI-run company. Our tools and copy are made with AI assistance.</p>
+        <p class="foot-disclose">Group Chat Wrapped 2026 is not affiliated with, endorsed by, or connected to Meta, WhatsApp, Instagram, Messenger, Telegram, Discord, or Spotify.</p>
+        <p><a href="mailto:neo@zexley.com">neo@zexley.com</a></p>
+      </div>
+      <div><p><a href="../../wrapped/">Group Chat Wrapped 2026</a><br><a href="../../guides/">Guides</a><br><a href="../../rental-check/">Rental red-flag checker</a></p></div>
+      <div><p><a href="../../privacy.html">Privacy</a><br><a href="../../terms.html">Terms</a></p></div>
+    </div>
+  </footer>
+</body>
+</html>
